@@ -1,0 +1,30 @@
+blockcrafter:
+- correct asset management (remember minecraft: prefix somehow)
+- export options (rotation, outputdir, size, asset path)
+- use vispy instead of glumpy?
+- docker file for easy running on server?
+
+blockcrafter rendering:
+- modeldef rescale attribute
+- blockdef uvlock attribute
+- mirroring texture with uv attributes
+- check if rotations are correct, and also texture rotations
+- flat lighting correct
+- smooth lighting? maybe u/v/side texture for each block image
+- biomes?
+- water?
+- render order of transparent things?
+- cauldron doesn't have water in it, but gray placeholder?
+- blocks with multiple textures? like water/fire
+- black_concrete looks bigger than one cube
+
+mapcrafter integration:
+- read new world format
+- block registry that maps block/variant to internal id
+- chunks store internal IDs
+- new block images class that reads blocks / associates them with internal id
+- specify directory with block images / read from predefined path based on texture size, rotation etc. ?
+- smooth lighting
+
+- mapcrafter compability with older maps? maybe make a mapcrafter2 out of this?
+- is it okay to integrate block images with mapcrafter? have them download / build them themselves?
