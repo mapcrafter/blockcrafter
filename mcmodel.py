@@ -5,12 +5,19 @@ import os
 import json
 import itertools
 
+# okay, first some termini:
+# modeldef: json structure like blockstates/*.json
+# modelref: json structure of modeldef when a model is referenced
+#               ({"model" : "block/block_blah", "x" : 180})
+# blockdef: json structure like models/*.json
+# variant: a dictionary showing mapping of values to variables
+
 BASE = os.path.join(os.path.abspath(os.path.dirname(__file__)), "assets/minecraft")
 MODEL_BASE = os.path.join(BASE, "models")
 TEXTURE_BASE = os.path.join(BASE, "textures")
 
 model_cache = {}
-def load_model(path):
+def load_modeldef(path):
     global model_cache
     if path in model_cache:
         return model_cache[path]
@@ -21,7 +28,7 @@ def load_model(path):
     elements = {}
 
     if "parent" in m:
-        parent = load_model(os.path.join(MODEL_BASE, m["parent"] + ".json"))
+        parent = load_modeldef(os.path.join(MODEL_BASE, m["parent"] + ".json"))
         textures.update(parent["textures"])
         if "elements" in parent:
             elements = parent["elements"]
@@ -30,47 +37,57 @@ def load_model(path):
     if "elements" in m:
         elements = m["elements"]
 
-    model = dict(textures=textures, elements=elements)
-    #print("Loaded:", path, model)
-    model_cache[path] = model
-    return model
+    modeldef = dict(textures=textures, elements=elements)
+    model_cache[path] = modeldef
+    return modeldef
 
-def resolve_texture(texture, textures):
+def resolve_texture(texturesdef, texture):
     if not texture.startswith("#"):
         return os.path.join(TEXTURE_BASE, texture + ".png")
     name = texture[1:]
-    if not name in textures:
+    if not name in texturesdef:
         return None
-    return resolve_texture(textures[name], textures)
+    return resolve_texture(texturesdef, texturesdef[name])
 
-def resolve_element(element, textures):
+def resolve_element(texturesdef, elementdef):
     faces = {}
-    for side, face in element["faces"].items():
-        faces[side] = resolve_texture(face["texture"], textures)
+    for direction, facedef in elementdef["faces"].items():
+        faces[side] = resolve_texture(textures, face["texture"])
     return faces
 
-def is_complete(model):
+def is_complete(modeldef):
     textures = set()
-    for element in model["elements"]:
-        for side, face in element["faces"].items():
-            textures.add(face["texture"])
-    #print("textures", textures)
-    return all([ resolve_texture(t, textures) is not None for t in textures ])
+    for elementdef in modeldef["elements"]:
+        for direction, facedef in elementdef["faces"].items():
+            textures.add(facedef["texture"])
+    return all([ resolve_texture(textures, t) is not None for t in textures ])
 
-def load_blockstate(path):
+def load_blockdef(path):
     m = json.load(open(path))
     return m
 
-def parse_condition(condition):
+def parse_variant(condition):
     if condition == "":
         return {}
     return dict(map(lambda pair: pair.split("="), condition.split(",")))
+
+def encode_variant(variant):
+    items = list(variant.items())
+    items.sort(key = lambda i: i[0])
+    return ",".join(map(lambda i: "=".join(i), items))
+
 def is_condition_fulfilled(condition, variant):
+    # condition and variant are both dictionaries
+    # key => value mean that variable 'key' has value 'value'
+    # ==> variant variables must have same values as condition
+    # some litte quirks:
+    # - sometimes values are of type bool (from json) => make that to a string
+    # - values in condition may be of form 'value1|value2' => means that
+    #     values 'value1' and 'value2' are acceptable
     for key, value in condition.items():
         if not key in variant:
             return False
-        
-        # HMM hack
+
         if type(value) == bool:
             value = "true" if value else "false"
 
@@ -81,7 +98,7 @@ def is_condition_fulfilled(condition, variant):
             return False
     return True
 
-def get_blockstate_domain(blockstate):
+def get_blockdef_variables(blockdef):
     variables = {}
 
     def apply_condition(condition):
@@ -90,25 +107,25 @@ def get_blockstate_domain(blockstate):
             if key not in variables:
                 variables[key] = set()
             
-            # HMM hack
             if type(value) == bool:
                 value = "true" if value else "false"
 
             values = set([value])
             if "|" in value:
                 values = set(value.split("|"))
-            # HMM hack
+            # TODO this is a bit hacky
+            # (just assume there must be true to false value, and vice versa)
             if "true" in values:
                 values.add("false")
             if "false" in values:
                 values.add("true")
             variables[key].update(values)
 
-    if "variants" in blockstate:
-        for condition, variant in blockstate["variants"].items():
-            apply_condition(parse_condition(condition))
-    elif "multipart" in blockstate:
-        for part in blockstate["multipart"]:
+    if "variants" in blockdef:
+        for condition, variant in blockdef["variants"].items():
+            apply_condition(parse_variant(condition))
+    elif "multipart" in blockdef:
+        for part in blockdef["multipart"]:
             if not "when" in part:
                 continue
             when = part["when"]
@@ -122,29 +139,32 @@ def get_blockstate_domain(blockstate):
         assert False, "There must be variants defined!"
     return variables
 
-def get_domain_variants(domain):
+def get_variable_variants(variables):
     # from a dictionary like {'variable1' : {'value1', 'value2'}}
     # returns all possible variants
-    if len(domain) == 0:
+    if len(variables) == 0:
         return [{}]
     
-    keys = list(domain.keys())
-    values = list(domain.values())
+    keys = list(variables.keys())
+    values = list(variables.values())
 
     variants = []
     for product in itertools.product(*values):
         variants.append(dict(list(zip(keys, product))))
     return variants
 
-def get_blockstate_models(blockstate, variant):
+def get_blockdef_variants(blockdef):
+    return get_variable_variants(get_blockdef_variables(blockdef))
+
+def get_blockdef_modelrefs(blockdef, variant):
     models = []
-    if "variants" in blockstate:
-        for condition, model in blockstate["variants"].items():
-            condition = parse_condition(condition)
+    if "variants" in blockdef:
+        for condition, model in blockdef["variants"].items():
+            condition = parse_variant(condition)
             if is_condition_fulfilled(condition, variant):
                 models.append(model)
-    elif "multipart" in blockstate:
-        for part in blockstate["multipart"]:
+    elif "multipart" in blockdef:
+        for part in blockdef["multipart"]:
             if not "when" in part:
                 models.append(part["apply"])
                 continue
@@ -162,25 +182,25 @@ def get_blockstate_models(blockstate, variant):
 
 if __name__ == "__main__":
     #for path in sys.argv[1:]:
-    #    m = load_model(path)
+    #    m = load_modeldef(path)
     #    print(path, is_complete(m))
     #    print(m["elements"])
     #    print(resolve_element(m["elements"][0], m["textures"]))
 
-    import functools
     total_variants = 0
     for path in sys.argv[1:]:
-        blockstate = load_blockstate(path)
-        domain = get_blockstate_domain(blockstate)
-        variants = functools.reduce(lambda x, y: x * y, map(lambda v: len(v), domain.values()), 1)
-        total_variants += variants
+        blockdef = load_blockdef(path)
+        variables = get_blockdef_variables(blockdef)
+        variants = get_blockdef_variants(blockdef)
+        total_variants += len(variants)
         print(path)
-        print("Domain:", domain)
-        print("#variants:", variants)
-        for variant in get_domain_variants(domain):
+        print("Variant variables:", variables)
+        print("#variants:", len(variants))
+        for variant in variants:
             print(variant)
-            for model in get_blockstate_models(blockstate, variant):
-                print("\t", model)
+            for modelrefs in get_blockdef_modelrefs(blockdef, variant):
+                print("=> ", modelrefs)
         print("")
     print("Total variants:", total_variants)
     print("Size: %.2f MB" % (total_variants*32*32*4 / (1024*1024)))
+

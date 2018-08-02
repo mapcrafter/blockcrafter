@@ -1,10 +1,12 @@
-
+import os
 import numpy as np
+import math
+import time
 from PIL import Image
 from glumpy import app, gl, glm, gloo, data
 from glumpy import transforms
 
-import model
+import mcmodel
 
 def geom_cube():
     vtype = [('a_position', np.float32, 3),
@@ -225,7 +227,7 @@ def cube_side(i):
         (-90, 0, 1, 0), # neg x
         (-90, 1, 0, 0), # pos y
         (90, 1, 0, 0), # neg y
-        (90, 0, 0, 1), # pos z
+        (0, 0, 0, 1), # pos z
         (180, 0, 1, 0), # neg z
     ]
 
@@ -276,11 +278,16 @@ class Cube:
         for i, side in enumerate(sides):
             normal, transform = cube_side(i)
             texture = side[0].view(gloo.Texture2D)
-            if i == 4:
-                # top texture must actually be a bit rotated
-                glm.rotate(transform, -90, 0, 0, 1)
-                #texture.interpolation = gl.GL_LINEAR
-                pass
+            #if i == 4:
+            #    # top texture must actually be a bit rotated
+            #    glm.rotate(transform, -90, 0, 0, 1)
+            #    #texture.interpolation = gl.GL_LINEAR
+            #    pass
+            #if i == 3:
+            #    # bottom texture must actually be a bit rotated
+            #    glm.rotate(transform, 90, 0, 1, 0)
+            #if i != 2 and i != 3:
+            #    continue
             uv0, uv1 = side[1]
             texcoords = np.array([(uv0[0], uv1[1]), uv0, uv1, (uv1[0], uv0[1])], dtype=np.float32)
             glm.translate(transform, 0.0, 0.0, 0.0)
@@ -339,7 +346,7 @@ class Element(Cube):
 
         faces = {}
         for direction, facedef in elementdef["faces"].items():
-            path = model.resolve_texture(facedef["texture"], texturesdef)
+            path = mcmodel.resolve_texture(texturesdef, facedef["texture"])
             if path is None:
                 raise RuntimeError("Face in direction '%s' has no texture associated" % direction)
             uvs = np.array(facedef.get("uv", [0, 0, 16, 16]), dtype=np.float32) / 16.0
@@ -360,9 +367,52 @@ class Model:
         for elementdef in modeldef["elements"]:
             self.elements.append(Element(elementdef, modeldef["textures"]))
 
-    def render(self, model, view, projection):
+    def render(self, model, view, projection, modelref={}, rotation=0):
+        m = np.eye(4, dtype=np.float32)
+        if "x" in modelref:
+            glm.rotate(m, modelref["x"], 1, 0, 0)
+        if "y" in modelref:
+            glm.rotate(m, modelref["y"], 0, 1, 0)
+        model = np.dot(m, model)
+
+        if "uvlock" in modelref:
+            # TODO
+            pass
+
         for element in self.elements:
             element.render(model, view, projection)
+
+class Block:
+    def __init__(self, blockdef):
+        self.blockdef = blockdef
+        self.models = {}
+        self.variants = {}
+
+    def _load_modeldef(self, name):
+        modeldef = mcmodel.load_modeldef(os.path.join(mcmodel.MODEL_BASE, name + ".json"))
+        model = Model(modeldef)
+        return model
+
+    def _load_variant(self, variant):
+        modelrefs = []
+        for modelref in mcmodel.get_blockdef_modelrefs(self.blockdef, variant):
+            # TODO
+            if type(modelref) == list:
+                modelref = modelref[0]
+            if not modelref["model"] in self.models:
+                self.models[modelref["model"]] = self._load_modeldef(modelref["model"])
+            modelrefs.append(modelref)
+        return modelrefs
+
+    def render(self, variant, model, view, projection, rotation=0):
+        variant_str = mcmodel.encode_variant(variant)
+        if variant_str not in self.variants:
+            self.variants[variant_str] = self._load_variant(variant)
+
+        modelrefs = self.variants[variant_str]
+        for modelref in modelrefs:
+            glmodel = self.models[modelref["model"]]
+            glmodel.render(model, view, projection, modelref=modelref, rotation=rotation)
 
 def create_transform_ortho(aspect=1.0, offscreen=False, fake_ortho=True):
     model = np.eye(4, dtype=np.float32)

@@ -8,7 +8,7 @@ from PIL import Image
 from glumpy import app, gl, glm, gloo, data, key
 from glumpy import transforms
 
-import model
+import mcmodel
 import render
 
 window = app.Window(color=(0.30, 0.30, 0.35, 1.00))
@@ -27,9 +27,13 @@ cubemap = np.stack([
 ], axis=0).view(gloo.TextureCube)
 cube = render.CubemapCube(cubemap)
 
-m = model.load_model(sys.argv[1])
-element = render.Element(m["elements"][0], m["textures"])
-mmm = render.Model(m)
+blockdef = mcmodel.load_blockdef(sys.argv[1])
+glblock = render.Block(blockdef)
+variants = mcmodel.get_blockdef_variants(blockdef)
+print("Block has variants:")
+for variant in variants:
+    print("-", variant)
+variant_index = 0
 
 views = ["perspective", "ortho", "fake_ortho"]
 view_index = 0
@@ -41,7 +45,7 @@ model, view, projection = None, None, None
 
 first_render = True
 run_phi = False
-phi = 45
+phi = 0
 
 @window.event
 def on_draw(dt):
@@ -63,34 +67,15 @@ def on_draw(dt):
         else:
             assert False, "Invalid view type '%s'" % view
 
-    texture = None
-    fbo = None
-    if first_render:
-        w, h = 32, 32
-        texture = np.zeros((h, w, 4), dtype=np.uint8).view(gloo.Texture2D)
-        depth = np.zeros((h, w), dtype=np.float32).view(gloo.DepthTexture)
-        fbo = gloo.FrameBuffer(color=[texture], depth=depth)
-        fbo.activate()
-
-        projection = glm.ortho(-1, 1, -1, 1, 2.0, 50.0)
-        glm.scale(projection, 1.0, -1.0, 1.0)
-
-        gl.glViewport(0, 0, w, h)
-        gl.glClearColor(0.0, 0.0, 0.0, 0.0)
-        gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
-        gl.glEnable(gl.GL_DEPTH_TEST)
-
     rotation = rotation_index
     if run_phi:
         phi += 0.2
     actual_model = np.dot(render.create_model_transform(rotation, phi), model)
-    mmm.render(actual_model, view, projection)
 
-    if first_render:
-        image = Image.fromarray(texture.get())
-        image.save("block.png")
-        fbo.deactivate()
-        first_render = False
+    #glmodel.render(actual_model, view, projection)
+
+    current_variant = variants[variant_index]
+    glblock.render(current_variant, actual_model, view, projection, rotation=rotation)
 
 @window.event
 def on_resize(width, height):
@@ -99,7 +84,7 @@ def on_resize(width, height):
 
 @window.event
 def on_key_press(code, mod):
-    global view_index, model, view, projection, rotation_index, run_phi
+    global view_index, model, view, projection, rotation_index, variant_index, run_phi
 
     if code == ord("V"):
         view_index = (view_index + 1) % len(views)
@@ -110,6 +95,11 @@ def on_key_press(code, mod):
 
     if code == key.RIGHT:
         rotation_index = (rotation_index + 1) % len(rotations)
+
+    if code == key.DOWN:
+        variant_index = (variant_index - 1) % len(variants)
+    if code == key.UP:
+        variant_index = (variant_index + 1) % len(variants)
 
     if code == key.SPACE:
         run_phi = not run_phi
