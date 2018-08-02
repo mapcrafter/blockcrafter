@@ -31,18 +31,37 @@ m = model.load_model(sys.argv[1])
 element = render.Element(m["elements"][0], m["textures"])
 mmm = render.Model(m)
 
+views = ["perspective", "ortho", "fake_ortho"]
+view_index = 0
+
+rotations = ["top-left", "top-right", "bottom-right", "bottom-left"]
+rotation_index = 0
+
+model, view, projection = None, None, None
+
 first_render = True
-run_rotation = False
+run_phi = False
 phi = 45
 
 @window.event
 def on_draw(dt):
-    global first_render, phi, projection
+    global first_render, phi, model, view, projection
 
     window.clear()
+    w, h = window.get_size()
 
-    if run_rotation:
-        phi += 0.2
+    if model is None:
+        aspect = w / h
+        v = views[view_index]
+
+        if v == "perspective":
+            model, view, projection = render.create_transform_perspective(aspect=aspect)
+        elif v == "ortho":
+            model, view, projection = render.create_transform_ortho(aspect=aspect, fake_ortho=False)
+        elif v == "fake_ortho":
+            model, view, projection = render.create_transform_ortho(aspect=aspect, fake_ortho=True)
+        else:
+            assert False, "Invalid view type '%s'" % view
 
     texture = None
     fbo = None
@@ -61,27 +80,11 @@ def on_draw(dt):
         gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
         gl.glEnable(gl.GL_DEPTH_TEST)
 
-    model = np.eye(4, dtype=np.float32)
-    # for ortho
-    #glm.scale(model, 1.0, 0.816, 1.0)
-    #glm.scale(model, 1.0 / math.sqrt(2))
-    ##glm.scale(model, 0.5)
-    #glm.rotate(model, 45, 0, 1, 0)
-    # hmm it's about 19 degrees?
-    #glm.rotate(model, 30, 1, 0, 0)
-
-    # for perspective
-    glm.rotate(model, phi, 0, 1, 0)
-    glm.rotate(model, 25, 1, 0, 0)
-    #glm.rotate(model, -90, 0, 1, 0)
-
-    mmm.render(model, view, projection)
-
-    glm.scale(model, 0.5)
-    cube["u_model"] = model
-    cube["u_projection"] = projection
-    cube['u_normal'] = np.array(np.matrix(np.dot(view, model)).I.T)
-    #cube.render(model)
+    rotation = rotation_index
+    if run_phi:
+        phi += 0.2
+    actual_model = np.dot(render.create_model_transform(rotation, phi), model)
+    mmm.render(actual_model, view, projection)
 
     if first_render:
         image = Image.fromarray(texture.get())
@@ -91,21 +94,28 @@ def on_draw(dt):
 
 @window.event
 def on_resize(width, height):
-    global view, projection
-    view = glm.translation(0, 0, -5)
-    aspect = width / height
-    projection = glm.perspective(45.0, width / float(height), 2.0, 100.0)
-    #projection = glm.ortho(-aspect, aspect, -1.0, 1.0, 2.0, 50.0)
+    global model, view, projection
+    model, view, projection = None, None, None
 
 @window.event
 def on_key_press(code, mod):
-    global run_rotation
+    global view_index, model, view, projection, rotation_index, run_phi
+
+    if code == ord("V"):
+        view_index = (view_index + 1) % len(views)
+        model, view, projection = None, None, None
+
+    if code == key.LEFT:
+        rotation_index = (rotation_index - 1) % len(rotations)
+
+    if code == key.RIGHT:
+        rotation_index = (rotation_index + 1) % len(rotations)
+
+    if code == key.SPACE:
+        run_phi = not run_phi
 
     if code == ord("Q"):
         window.close()
-
-    if code == key.SPACE:
-        run_rotation = not run_rotation
 
 @window.event
 def on_init():
