@@ -16,7 +16,16 @@ window = app.Window(color=(0.30, 0.30, 0.35, 1.00))
 view = np.eye(4, dtype=np.float32)
 projection = np.eye(4, dtype=np.float32)
 
-#cube = render.Cube([])
+load = lambda name: np.array(Image.open(name))
+cubemap = np.stack([
+    load("cube/pos_x.png"),
+    load("cube/neg_x.png"),
+    load("cube/pos_y.png"),
+    load("cube/neg_y.png"),
+    load("cube/pos_z.png"),
+    load("cube/neg_z.png"),
+], axis=0).view(gloo.TextureCube)
+cube = render.CubemapCube(cubemap)
 
 m = model.load_model(sys.argv[1])
 element = render.Element(m["elements"][0], m["textures"])
@@ -24,7 +33,7 @@ mmm = render.Model(m)
 
 first_render = True
 run_rotation = False
-phi = 15
+phi = 45
 
 @window.event
 def on_draw(dt):
@@ -54,18 +63,25 @@ def on_draw(dt):
 
     model = np.eye(4, dtype=np.float32)
     # for ortho
-    glm.scale(model, 1.0, 0.816, 1.0)
-    glm.scale(model, 1.0 / math.sqrt(2))
-    #glm.scale(model, 0.5)
-    glm.rotate(model, 45, 0, 1, 0)
+    #glm.scale(model, 1.0, 0.816, 1.0)
+    #glm.scale(model, 1.0 / math.sqrt(2))
+    ##glm.scale(model, 0.5)
+    #glm.rotate(model, 45, 0, 1, 0)
     # hmm it's about 19 degrees?
-    glm.rotate(model, 30, 1, 0, 0)
+    #glm.rotate(model, 30, 1, 0, 0)
 
     # for perspective
-    #glm.rotate(model, phi, 0, 1, 0)
-    #glm.rotate(model, 25, 1, 0, 0)
+    glm.rotate(model, phi, 0, 1, 0)
+    glm.rotate(model, 25, 1, 0, 0)
+    #glm.rotate(model, -90, 0, 1, 0)
 
     mmm.render(model, view, projection)
+
+    glm.scale(model, 0.5)
+    cube["u_model"] = model
+    cube["u_projection"] = projection
+    cube['u_normal'] = np.array(np.matrix(np.dot(view, model)).I.T)
+    #cube.render(model)
 
     if first_render:
         image = Image.fromarray(texture.get())
@@ -78,8 +94,8 @@ def on_resize(width, height):
     global view, projection
     view = glm.translation(0, 0, -5)
     aspect = width / height
-    #projection = glm.perspective(45.0, width / float(height), 2.0, 100.0)
-    projection = glm.ortho(-aspect, aspect, -1.0, 1.0, 2.0, 50.0)
+    projection = glm.perspective(45.0, width / float(height), 2.0, 100.0)
+    #projection = glm.ortho(-aspect, aspect, -1.0, 1.0, 2.0, 50.0)
 
 @window.event
 def on_key_press(code, mod):

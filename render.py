@@ -106,7 +106,8 @@ void main()
     vec4 t_color = textureCube(u_texture, v_texcoord);
 
     // Final color
-    gl_FragColor = vec4(t_color.rgb * (0.1 + 0.9*brightness * u_light_intensity), t_color.a);
+    //gl_FragColor = vec4(t_color.rgb * (0.1 + 0.9*brightness * u_light_intensity), t_color.a);
+    gl_FragColor = t_color;
 }
 """
 
@@ -120,11 +121,14 @@ attribute vec2 a_texcoord;      // Vertex texture coordinates
 varying vec3   v_normal;        // Interpolated normal (out)
 varying vec3   v_position;      // Interpolated position (out)
 varying vec2   v_texcoord;      // Interpolated fragment texture coordinates (out)
+varying vec3 v_fragpos;
 
 void main()
 {
     // Assign varying variables
-    v_normal   = a_normal;
+    v_normal = (u_model * vec4(a_normal, 1.0)).xyz;
+    v_fragpos = (u_model, vec4(a_position, 1.0)).xyz;
+
     v_position = a_position;
     v_texcoord = a_texcoord;
 
@@ -145,6 +149,7 @@ uniform vec3      u_light_intensity; // Light intensity
 varying vec3      v_normal;          // Interpolated normal (in)
 varying vec3      v_position;        // Interpolated position (in)
 varying vec2      v_texcoord;        // Interpolated fragment texture coordinates (in)
+varying vec3 v_fragpos;
 void main()
 {
     // Calculate normal in world coordinates
@@ -174,43 +179,54 @@ void main()
     if (t_color.a <= 0.001) {
         discard;
     }
-    //gl_FragColor = vec4(t_color.rgb * (0.1 + 0.9*brightness * u_light_intensity), t_color.a);
-    gl_FragColor = t_color;
-    //gl_FragColor = vec4((v_normal + 1.0) / 2.0, 1.0);
+    //gl_FragColor = vec4(t_color.rgb * (0.5 + 0.4*brightness * u_light_intensity), t_color.a);
+    //gl_FragColor = t_color;
+
+    gl_FragColor = vec4((v_normal + 1.0) / 2.0, 1.0);
+
+
+    vec3 norm = normalize(v_normal);
+    vec3 lightDir = normalize(u_light_position - v_fragpos);
+
+    float diff = max(dot(norm, lightDir), 0.0);
+    vec3 lightColor = vec3(1.0, 1.0, 1.0);
+    vec3 diffuse = diff * lightColor;
+
+    gl_FragColor = vec4(t_color.rgb * (0.6 + 0.4 * diffuse), t_color.a);
 }
 """
 
-#class Cube(gloo.Program):
-#    def __init__(self, cubemap, vertex=vertex, fragment=fragment, light=(-2, 2, 2)):
-#        super().__init__(vertex, fragment)
-#
-#        self._vertices, self._indices = geom_cube()
-#        self.bind(self._vertices)
-#
-#        self["u_texture"] = cubemap
-#
-#        self["u_model"] = self.model
-#        self["u_view"] = glm.translation(0, 0, -5)
-#        self["u_projection"] = np.eye(4, dtype=np.float32)
-#
-#        self["u_light_position"] = light
-#        self["u_light_intensity"] = 1.0, 1.0, 1.0
-#
-#    @property
-#    def model(self):
-#        return np.eye(4, dtype=np.float32)
-#
-#    def render(self):
-#        self.draw(gl.GL_TRIANGLES, self._indices)
-#
+class CubemapCube(gloo.Program):
+    def __init__(self, cubemap, vertex=vertex, fragment=fragment, light=(-2, 2, 2)):
+        super().__init__(vertex, fragment)
+
+        self._vertices, self._indices = geom_cube()
+        self.bind(self._vertices)
+
+        self["u_texture"] = cubemap
+
+        self["u_model"] = self.model
+        self["u_view"] = glm.translation(0, 0, -5)
+        self["u_projection"] = np.eye(4, dtype=np.float32)
+
+        self["u_light_position"] = light
+        self["u_light_intensity"] = 1.0, 1.0, 1.0
+
+    @property
+    def model(self):
+        return np.eye(4, dtype=np.float32)
+
+    def render(self, model):
+        self.draw(gl.GL_TRIANGLES, self._indices)
+
 def cube_side(i):
     sides = [
-        (1.0, (0, 0, 1),  (0, 1, 1, 1)), # pos x
-        (-1.0, (0, 0, -1), (0, 1, 1, 1)), # neg x # flip y!
-        (1.0, (0, 0, 1),  (-90, 0, 1, 0)), # pos y
-        (-1.0, (0, 0, -1), (-90, 0, 1, 0)), # neg y # flip x!
-        (1.0, (0, 0, 1),  (-90, 1, 0, 0)), # pos z
-        (-1.0, (0, 0, -1), (-90, 1, 0, 0)), # neg z # flip y!
+        (90, 0, 1, 0), # pos x
+        (-90, 0, 1, 0), # neg x
+        (-90, 1, 0, 0), # pos y
+        (90, 1, 0, 0), # neg y
+        (90, 0, 0, 1), # pos z
+        (180, 0, 1, 0), # neg z
     ]
 
     normals = [
@@ -223,9 +239,8 @@ def cube_side(i):
     ]
 
     transform = np.eye(4, dtype=np.float32)
-    glm.scale(transform, sides[i][0], 1.0, 1.0)
-    glm.translate(transform, *sides[i][1])
-    glm.rotate(transform, *sides[i][2])
+    glm.translate(transform, 0, 0, 1)
+    glm.rotate(transform, *sides[i])
     return np.array(normals[i], dtype=np.float32), transform
 
 class TextureQuad(gloo.Program):
@@ -240,8 +255,7 @@ class TextureQuad(gloo.Program):
 
         # TODO
         self["a_normal"] = np.array([0.0, 0.0, 1.0])
-        self["u_light_position"] = -2, -2, 2
-        self["u_light_intensity"] = 1.0, 1.0, 1.0
+        self["u_light_position"] = -1.0, 2.0, 5.0
 
         self.texture = texture
         #self.texture.interpolation = gl.GL_LINEAR
@@ -252,6 +266,7 @@ class TextureQuad(gloo.Program):
         self["u_model"] = np.dot(self.model, model)
         self["u_view"] = view
         self["u_projection"] = projection
+        self["u_light_position"] = -1.0, 2.0, 5.0
         #self["u_normal"] = np.array(np.matrix(np.dot(view, np.dot(self.model, model))).I.T)
         self.draw(gl.GL_TRIANGLE_STRIP)
 
@@ -262,10 +277,13 @@ class Cube:
             normal, transform = cube_side(i)
             texture = side[0].view(gloo.Texture2D)
             if i == 4:
-                glm.rotate(transform, -90, 0, 1, 0)
+                # top texture must actually be a bit rotated
+                glm.rotate(transform, -90, 0, 0, 1)
                 #texture.interpolation = gl.GL_LINEAR
+                pass
             uv0, uv1 = side[1]
             texcoords = np.array([(uv0[0], uv1[1]), uv0, uv1, (uv1[0], uv0[1])], dtype=np.float32)
+            glm.translate(transform, 0.0, 0.0, 0.0)
             self.faces.append(TextureQuad(model=transform, texture=texture, texcoords=texcoords))
 
     def render(self, model, view, projection):
@@ -296,6 +314,7 @@ class Element(Cube):
                     "y" : [0, 1, 0],
                     "z" : [0, 0, 1]}[self.rotation["axis"]]
             origin = (np.array(self.rotation.get("origin", [8, 8, 8]), dtype=np.float32) - 8.0) / 16.0 * 2.0
+            origin *= -1.0
             glm.translate(model, *origin)
             glm.rotate(model, self.rotation["angle"], *axis)
             origin *= -1.0
@@ -310,12 +329,12 @@ class Element(Cube):
     def load_faces(elementdef, texturesdef):
         # order of minecraft directions to order of cube sides
         mc_to_opengl = [
-            "north",  # pos x
-            "south",  # neg x
-            "east",   # pos y
-            "west",   # neg y
-            "up",     # pos z
-            "bottom", # neg z
+            "east",   # pos x
+            "west",   # neg x
+            "up",     # pos y
+            "down",   # neg y
+            "south",  # pos z
+            "north",  # neg z
         ]
 
         faces = {}
