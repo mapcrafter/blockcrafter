@@ -14,7 +14,6 @@ variants = sorted(mcmodel.get_blockdef_variants(blockdef), key=mcmodel.encode_va
 print("Block has variants:")
 for variant in variants:
     print("-", variant)
-variant_index = 0
 
 views = ["perspective", "ortho", "fake_ortho"]
 rotations = ["top-left", "top-right", "bottom-right", "bottom-left"]
@@ -99,7 +98,7 @@ class Canvas(app.Canvas):
             self.phi += 0.2
         actual_model = np.dot(render.create_model_transform(rotation, self.phi), self.model)
 
-        current_variant = variants[variant_index]
+        current_variant = variants[self.variant_index]
         glblock.render(current_variant, actual_model, self.view, self.projection, rotation=rotation)
 
         #render.draw_line((0, 0, 0), (10, 0, 0), actual_model, view, projection, color=(1, 0, 0, 1))

@@ -299,7 +299,7 @@ class TextureQuad(gloo.Program):
         self["u_projection"] = projection
         self["u_light_position"] = -1.0, 2.0, 5.0
         #self["u_normal"] = np.array(np.matrix(np.dot(view, np.dot(self.model, model))).I.T)
-        self.draw(gl.GL_TRIANGLE_STRIP)
+        self.draw(gloo.gl.GL_TRIANGLE_STRIP)
 
         #for x in (-1.0, 1.0):
         #    for y in (-1.0, 1.0):
