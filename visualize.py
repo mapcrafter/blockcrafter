@@ -2,30 +2,11 @@
 
 import sys
 import numpy as np
-import json
 import math
-from PIL import Image
-from glumpy import app, gl, glm, gloo, data, key
-from glumpy import transforms
+from vispy import app, gloo
 
 import mcmodel
 import render
-
-window = app.Window(color=(0.30, 0.30, 0.35, 1.00))
-
-view = np.eye(4, dtype=np.float32)
-projection = np.eye(4, dtype=np.float32)
-
-load = lambda name: np.array(Image.open(name))
-cubemap = np.stack([
-    load("cube/pos_x.png"),
-    load("cube/neg_x.png"),
-    load("cube/pos_y.png"),
-    load("cube/neg_y.png"),
-    load("cube/pos_z.png"),
-    load("cube/neg_z.png"),
-], axis=0).view(gloo.TextureCube)
-cube = render.CubemapCube(cubemap)
 
 blockdef = mcmodel.load_blockdef(sys.argv[1])
 glblock = render.Block(blockdef)
@@ -36,88 +17,95 @@ for variant in variants:
 variant_index = 0
 
 views = ["perspective", "ortho", "fake_ortho"]
-view_index = 0
-
 rotations = ["top-left", "top-right", "bottom-right", "bottom-left"]
-rotation_index = 0
 
-model, view, projection = None, None, None
+class Canvas(app.Canvas):
+    def __init__(self):
+        super().__init__(keys="interactive")
 
-first_render = True
-run_phi = False
-phi = 0
+        self.model, self.view, self.projection = None, None, None
 
-@window.event
-def on_draw(dt):
-    global first_render, phi, model, view, projection
+        self.run_phi = False
+        self.phi = 0
 
-    window.clear()
-    w, h = window.get_size()
+        self.variant_index = 0
+        self.view_index = 0
+        self.rotation_index = 0
 
-    if model is None:
-        aspect = w / h
-        v = views[view_index]
+        #gloo.gl.glEnable(gloo.gl.GL_DEPTH_TEST)
+        #gloo.gl.glDepthFunc(gloo.gl.GL_LESS)
 
-        if v == "perspective":
-            model, view, projection = render.create_transform_perspective(aspect=aspect)
-        elif v == "ortho":
-            model, view, projection = render.create_transform_ortho(aspect=aspect, fake_ortho=False)
-        elif v == "fake_ortho":
-            model, view, projection = render.create_transform_ortho(aspect=aspect, fake_ortho=True)
-        else:
-            assert False, "Invalid view type '%s'" % view
+        #gloo.gl.glEnable(gloo.gl.GL_BLEND)
+        #gloo.gl.glBlendEquationSeparate(gloo.gl.GL_FUNC_ADD, gloo.gl.GL_FUNC_ADD)
+        #gloo.gl.glBlendFuncSeparate(gloo.gl.GL_SRC_ALPHA, gloo.gl.GL_ONE_MINUS_SRC_ALPHA, gloo.gl.GL_ONE, gloo.gl.GL_ONE_MINUS_SRC_ALPHA)
 
-    rotation = rotation_index
-    if run_phi:
-        phi += 0.2
-    actual_model = np.dot(render.create_model_transform(rotation, phi), model)
+        self._timer = app.Timer("auto", connect=self.on_timer, start=True)
 
-    current_variant = variants[variant_index]
-    glblock.render(current_variant, actual_model, view, projection, rotation=rotation)
+        self.show()
 
-    #render.draw_line((0, 0, 0), (10, 0, 0), actual_model, view, projection, color=(1, 0, 0, 1))
-    #render.draw_line((0, 0, 0), (0, 10, 0), actual_model, view, projection, color=(0, 1, 0, 1))
-    #render.draw_line((0, 0, 0), (0, 0, 10), actual_model, view, projection, color=(0, 0, 1, 1))
+    def on_resize(self, event):
+        self.model, self.view, self.projection = None, None, None
 
-@window.event
-def on_resize(width, height):
-    global model, view, projection
-    model, view, projection = None, None, None
+        w, h = event.physical_size
+        gloo.set_viewport(0, 0, w, h)
 
-@window.event
-def on_key_press(code, mod):
-    global view_index, model, view, projection, rotation_index, variant_index, run_phi
+    def on_key_press(self, event):
+        if event.key == "V":
+            self.view_index = (self.view_index + 1) % len(views)
+            self.model, self.view, self.projection = None, None, None
 
-    if code == ord("V"):
-        view_index = (view_index + 1) % len(views)
-        model, view, projection = None, None, None
+        if event.key == "Left":
+            self.rotation_index = (self.rotation_index - 1) % len(rotations)
 
-    if code == key.LEFT:
-        rotation_index = (rotation_index - 1) % len(rotations)
+        if event.key == "Right":
+            self.rotation_index = (self.rotation_index + 1) % len(rotations)
 
-    if code == key.RIGHT:
-        rotation_index = (rotation_index + 1) % len(rotations)
+        if event.key == "Down":
+            self.variant_index = (self.variant_index - 1) % len(variants)
+        if event.key == "Up":
+            self.variant_index = (self.variant_index + 1) % len(variants)
 
-    if code == key.DOWN:
-        variant_index = (variant_index - 1) % len(variants)
-    if code == key.UP:
-        variant_index = (variant_index + 1) % len(variants)
+        if event.key == "Space":
+            self.run_phi = not self.run_phi
 
-    if code == key.SPACE:
-        run_phi = not run_phi
+        if event.key == ord("Q"):
+            self.close()
 
-    if code == ord("Q"):
-        window.close()
+    def on_timer(self, event):
+        self.update()
 
-@window.event
-def on_init():
-    gl.glEnable(gl.GL_DEPTH_TEST)
-    gl.glDepthFunc(gl.GL_LESS)
+    def on_draw(self, event):
+        gloo.set_state(depth_test=True, blend=True)
 
-    #gl.glEnable(gl.GL_CULL_FACE)
-    
-    gl.glEnable(gl.GL_BLEND)
-    gl.glBlendEquationSeparate(gl.GL_FUNC_ADD, gl.GL_FUNC_ADD)
-    gl.glBlendFuncSeparate(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA, gl.GL_ONE, gl.GL_ONE_MINUS_SRC_ALPHA)
+        gloo.set_clear_color((0.30, 0.30, 0.35, 1.00))
+        gloo.clear(color=True, depth=True)
+        w, h = self.physical_size
 
-app.run()
+        if self.model is None:
+            aspect = w / h
+            v = views[self.view_index]
+
+            if v == "perspective":
+                self.model, self.view, self.projection = render.create_transform_perspective(aspect=aspect)
+            elif v == "ortho":
+                self.model, self.view, self.projection = render.create_transform_ortho(aspect=aspect, fake_ortho=False)
+            elif v == "fake_ortho":
+                self.model, self.view, self.projection = render.create_transform_ortho(aspect=aspect, fake_ortho=True)
+            else:
+                assert False, "Invalid view type '%s'" % view
+
+        rotation = self.rotation_index
+        if self.run_phi:
+            self.phi += 0.2
+        actual_model = np.dot(render.create_model_transform(rotation, self.phi), self.model)
+
+        current_variant = variants[variant_index]
+        glblock.render(current_variant, actual_model, self.view, self.projection, rotation=rotation)
+
+        #render.draw_line((0, 0, 0), (10, 0, 0), actual_model, view, projection, color=(1, 0, 0, 1))
+        #render.draw_line((0, 0, 0), (0, 10, 0), actual_model, view, projection, color=(0, 1, 0, 1))
+        #render.draw_line((0, 0, 0), (0, 0, 10), actual_model, view, projection, color=(0, 0, 1, 1))
+
+if __name__ == "__main__":
+    c = Canvas()
+    app.run()

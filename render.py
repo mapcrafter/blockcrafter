@@ -3,8 +3,9 @@ import numpy as np
 import math
 import time
 from PIL import Image
-from glumpy import app, gl, glm, gloo, data
-from glumpy import transforms
+#from glumpy import app, gl, glm, gloo, data
+from vispy import app, gloo, io, geometry
+from glumpy import glm
 
 import mcmodel
 
@@ -262,7 +263,7 @@ class Lines(gloo.Program):
         self["u_view"] = view
         self["u_projection"] = projection
         self["u_color"] = color
-        self.draw(gl.GL_LINE_STRIP)
+        self.draw(gloo.gl.GL_LINE_STRIP)
 
 line_program = None
 def draw_line(p0, p1, model, view, projection, color=(1.0, 1.0, 1.0, 1.0)):
@@ -310,7 +311,7 @@ class Cube:
         self.faces = []
         for i, side in enumerate(sides):
             normal, transform = cube_side(i)
-            texture = side[0].view(gloo.Texture2D)
+            texture = gloo.Texture2D(data=side[0])
             #if i == 4:
             #    # top texture must actually be a bit rotated
             #    glm.rotate(transform, -90, 0, 0, 1)
@@ -384,7 +385,7 @@ class Element(Cube):
                 raise RuntimeError("Face in direction '%s' has no texture associated" % direction)
             uvs = np.array(facedef.get("uv", [0, 0, 16, 16]), dtype=np.float32) / 16.0
             uv0, uv1 = uvs[:2], uvs[2:]
-            faces[direction] = (np.array(Image.open(path)), (uv0, uv1))
+            faces[direction] = (io.imread(path), (uv0, uv1))
 
         # gather faces in order for cube sides
         sides = [ faces.get(direction, None) for direction in mc_to_opengl ]
