@@ -29,7 +29,7 @@ cube = render.CubemapCube(cubemap)
 
 blockdef = mcmodel.load_blockdef(sys.argv[1])
 glblock = render.Block(blockdef)
-variants = mcmodel.get_blockdef_variants(blockdef)
+variants = sorted(mcmodel.get_blockdef_variants(blockdef), key=mcmodel.encode_variant)
 print("Block has variants:")
 for variant in variants:
     print("-", variant)
@@ -72,10 +72,12 @@ def on_draw(dt):
         phi += 0.2
     actual_model = np.dot(render.create_model_transform(rotation, phi), model)
 
-    #glmodel.render(actual_model, view, projection)
-
     current_variant = variants[variant_index]
     glblock.render(current_variant, actual_model, view, projection, rotation=rotation)
+
+    #render.draw_line((0, 0, 0), (10, 0, 0), actual_model, view, projection, color=(1, 0, 0, 1))
+    #render.draw_line((0, 0, 0), (0, 10, 0), actual_model, view, projection, color=(0, 1, 0, 1))
+    #render.draw_line((0, 0, 0), (0, 0, 10), actual_model, view, projection, color=(0, 0, 1, 1))
 
 @window.event
 def on_resize(width, height):

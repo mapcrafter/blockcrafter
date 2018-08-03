@@ -198,6 +198,13 @@ void main()
 }
 """
 
+FRAGMENT_COLOR = """
+uniform vec4 u_color;
+void main() {
+    gl_FragColor = u_color;
+}
+"""
+
 class CubemapCube(gloo.Program):
     def __init__(self, cubemap, vertex=vertex, fragment=fragment, light=(-2, 2, 2)):
         super().__init__(vertex, fragment)
@@ -245,6 +252,26 @@ def cube_side(i):
     glm.rotate(transform, *sides[i])
     return np.array(normals[i], dtype=np.float32), transform
 
+class Lines(gloo.Program):
+    def __init__(self, count, vertex=VERTEX, fragment=FRAGMENT_COLOR):
+        super().__init__(vertex, fragment, count=count)
+
+    def render(self, points, model, view, projection, color=(1.0, 1.0, 1.0, 1.0)):
+        self["a_position"] = points
+        self["u_model"] = model
+        self["u_view"] = view
+        self["u_projection"] = projection
+        self["u_color"] = color
+        self.draw(gl.GL_LINE_STRIP)
+
+line_program = None
+def draw_line(p0, p1, model, view, projection, color=(1.0, 1.0, 1.0, 1.0)):
+    global line_program
+    if line_program is None:
+        line_program = Lines(2)
+
+    line_program.render([p0, p1], model, view, projection, color=color)
+
 class TextureQuad(gloo.Program):
     def __init__(self, vertex=VERTEX, fragment=FRAGMENT, texcoords=None, model=np.eye(4, dtype=np.float32), texture=None):
         super().__init__(vertex, fragment, count=4)
@@ -264,13 +291,19 @@ class TextureQuad(gloo.Program):
         self.model = model
 
     def render(self, model, view, projection):
+        model = np.dot(self.model, model)
         self["u_texture"] = self.texture
-        self["u_model"] = np.dot(self.model, model)
+        self["u_model"] = model
         self["u_view"] = view
         self["u_projection"] = projection
         self["u_light_position"] = -1.0, 2.0, 5.0
         #self["u_normal"] = np.array(np.matrix(np.dot(view, np.dot(self.model, model))).I.T)
         self.draw(gl.GL_TRIANGLE_STRIP)
+
+        #for x in (-1.0, 1.0):
+        #    for y in (-1.0, 1.0):
+        #        draw_line((x, y, 0), (x, y, 0.25), model, view, projection, color=(1.0, 1.0, 0.0, 1.0))
+        #draw_line((0, 0, 0.001), (0, 1, 0.001), model, view, projection, color=(1.0, 0.0, 1.0, 1.0))
 
 class Cube:
     def __init__(self, sides):
