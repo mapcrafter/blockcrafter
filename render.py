@@ -144,6 +144,7 @@ uniform mat4 u_normal;
 
 uniform sampler2D u_texture;
 uniform vec3 u_light_direction;
+uniform int u_face_index;
 
 varying vec3 v_position;
 varying vec2 v_texcoord;
@@ -176,6 +177,31 @@ void main() {
 }
 """
 
+FRAGMENT_TEXCOORD = """
+uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_projection;
+uniform mat4 u_normal;
+
+uniform sampler2D u_texture;
+uniform vec3 u_light_direction;
+uniform int u_face_index;
+
+varying vec3 v_position;
+varying vec2 v_texcoord;
+varying vec3 v_normal;
+
+void main() {
+    vec4 t_color = texture2D(u_texture, v_texcoord);
+    if (t_color.a <= 0.00001) {
+        discard;
+    }
+
+    gl_FragColor = vec4(vec3(v_texcoord.xy, float(u_face_index) / 6.0), 1.0);
+}
+"""
+
+
 FRAGMENT_COLOR = """
 uniform vec4 u_color;
 
@@ -207,30 +233,6 @@ class CubemapCube(gloo.Program):
     def render(self, model):
         self.draw(gl.GL_TRIANGLES, self._indices)
 
-def cube_side(i):
-    sides = [
-        (90, 0, 1, 0), # pos x
-        (-90, 0, 1, 0), # neg x
-        (-90, 1, 0, 0), # pos y
-        (90, 1, 0, 0), # neg y
-        (0, 0, 0, 1), # pos z
-        (180, 0, 1, 0), # neg z
-    ]
-
-    normals = [
-        (1, 0, 0),
-        (-1, 0, 0),
-        (0, 1, 0),
-        (0, -1, 0),
-        (0, 0, 1),
-        (0, 0, -1),
-    ]
-
-    transform = np.eye(4, dtype=np.float32)
-    glm.translate(transform, 0, 0, 1)
-    glm.rotate(transform, *sides[i])
-    return np.array(normals[i], dtype=np.float32), transform
-
 class Lines(gloo.Program):
     def __init__(self, count, vertex=VERTEX, fragment=FRAGMENT_COLOR):
         super().__init__(vertex, fragment, count=count)
@@ -259,12 +261,28 @@ def draw_line(p0, p1, model, view, projection, color=(1.0, 1.0, 1.0, 1.0)):
 
     line_program.render([p0, p1], model, view, projection, color=color)
 
-class TextureQuad(gloo.Program):
-    def __init__(self, vertex=VERTEX, fragment=FRAGMENT, texcoord=None, face_transform=np.eye(4, dtype=np.float32), texture=None):
+def get_face_transformation(face_index):
+    # rotations required to get each face
+    faces = [
+        (90, 0, 1, 0), # pos x
+        (-90, 0, 1, 0), # neg x
+        (-90, 1, 0, 0), # pos y
+        (90, 1, 0, 0), # neg y
+        (0, 0, 0, 1), # pos z
+        (180, 0, 1, 0), # neg z
+    ]
+
+    transform = np.eye(4, dtype=np.float32)
+    glm.translate(transform, 0, 0, 1)
+    glm.rotate(transform, *faces[face_index])
+    return transform
+
+class CubeFace(gloo.Program):
+    def __init__(self, texture, face_index=0, texcoord=None, vertex=VERTEX, fragment=FRAGMENT):
         super().__init__(vertex, fragment, count=4)
 
         self.texture = texture
-        self.face_transform = face_transform
+        self.face_transform = get_face_transformation(face_index)
 
         position = np.array([(-1,-1, 0, 1), (-1,+1, 0, 1), (+1,-1, 0, 1), (+1,+1, 0, 1)], dtype=np.float32)
         if texcoord is None:
@@ -273,14 +291,16 @@ class TextureQuad(gloo.Program):
         texture_dir1 = np.array([0, 1, 0, 0], dtype=np.float32)
         texture_dir2 = np.array([1, 0, 0, 0], dtype=np.float32)
 
-        self.position = np.dot(position, face_transform)[:, :3]
-        self.normal = np.dot(normal, face_transform)[:3]
-        self.texture_dir1 = np.dot(texture_dir1, face_transform)[:3]
-        self.texture_dir2 = np.dot(texture_dir2, face_transform)[:3]
+        self.position = np.dot(position, self.face_transform)[:, :3]
+        self.normal = np.dot(normal, self.face_transform)[:3]
+        self.texture_dir1 = np.dot(texture_dir1, self.face_transform)[:3]
+        self.texture_dir2 = np.dot(texture_dir2, self.face_transform)[:3]
 
         self["a_position"] = self.position
         self["a_texcoord"] = texcoord
         self["a_normal"] = self.normal
+
+        self["u_face_index"] = face_index
 
     def render(self, model, view, projection, normal_matrix=None):
         self["u_model"] = model
@@ -305,22 +325,10 @@ class Cube:
     def __init__(self, sides):
         self.faces = []
         for i, side in enumerate(sides):
-            normal, transform = cube_side(i)
             texture = gloo.Texture2D(data=side[0])
-            #if i == 4:
-            #    # top texture must actually be a bit rotated
-            #    glm.rotate(transform, -90, 0, 0, 1)
-            #    #texture.interpolation = gl.GL_LINEAR
-            #    pass
-            #if i == 3:
-            #    # bottom texture must actually be a bit rotated
-            #    glm.rotate(transform, 90, 0, 1, 0)
-            #if i != 2 and i != 3:
-            #    continue
             uv0, uv1 = side[1]
             texcoord = np.array([(uv0[0], uv1[1]), uv0, uv1, (uv1[0], uv0[1])], dtype=np.float32)
-            glm.translate(transform, 0.0, 0.0, 0.0)
-            self.faces.append(TextureQuad(face_transform=transform, texture=texture, texcoord=texcoord))
+            self.faces.append(CubeFace(texture, face_index=i, texcoord=texcoord))
 
     def render(self, model, view, projection):
         normal_matrix = np.array(np.matrix(np.dot(view, model)).I.T)
