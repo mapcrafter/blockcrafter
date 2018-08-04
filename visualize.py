@@ -101,9 +101,10 @@ class Canvas(app.Canvas):
         current_variant = variants[self.variant_index]
         glblock.render(current_variant, actual_model, self.view, self.projection, rotation=rotation)
 
-        #render.draw_line((0, 0, 0), (10, 0, 0), actual_model, view, projection, color=(1, 0, 0, 1))
-        #render.draw_line((0, 0, 0), (0, 10, 0), actual_model, view, projection, color=(0, 1, 0, 1))
-        #render.draw_line((0, 0, 0), (0, 0, 10), actual_model, view, projection, color=(0, 0, 1, 1))
+        v = lambda *a: np.array(a, dtype=np.float32)
+        render.draw_line(v(0, 0, 0), v(10, 0, 0), actual_model, self.view, self.projection, color=(1, 0, 0, 1))
+        render.draw_line(v(0, 0, 0), v(0, 10, 0), actual_model, self.view, self.projection, color=(0, 1, 0, 1))
+        render.draw_line(v(0, 0, 0), v(0, 0, 10), actual_model, self.view, self.projection, color=(0, 0, 1, 1))
 
 if __name__ == "__main__":
     c = Canvas()

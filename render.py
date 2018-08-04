@@ -115,92 +115,70 @@ void main()
 """
 
 VERTEX = """
-uniform mat4   u_model;         // Model matrix
-uniform mat4   u_view;          // View matrix
-uniform mat4   u_projection;    // Projection matrix
-attribute vec3 a_position;      // Vertex position
-attribute vec3 a_normal;        // Vertex normal
-attribute vec2 a_texcoord;      // Vertex texture coordinates
-varying vec3   v_normal;        // Interpolated normal (out)
-varying vec3   v_position;      // Interpolated position (out)
-varying vec2   v_texcoord;      // Interpolated fragment texture coordinates (out)
-varying vec3 v_fragpos;
+attribute vec3 a_position;
+attribute vec2 a_texcoord;
+attribute vec3 a_normal;
 
-void main()
-{
-    // Assign varying variables
-    v_normal = (u_model * vec4(a_normal, 1.0)).xyz;
-    v_fragpos = (u_model, vec4(a_position, 1.0)).xyz;
+uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_projection;
 
+varying vec3 v_position;
+varying vec2 v_texcoord;
+varying vec3 v_normal;
+
+void main() {
     v_position = a_position;
     v_texcoord = a_texcoord;
+    v_normal = a_normal;
 
-    // Final position
     gl_Position = u_projection * u_view * u_model * vec4(a_position, 1.0);
 }
 """
 
 FRAGMENT = """
-uniform mat4      u_model;           // Model matrix
-uniform mat4      u_view;            // View matrix
-uniform mat4      u_normal;          // Normal matrix
-uniform mat4      u_projection;      // Projection matrix
-uniform sampler2D u_texture;         // Texture 
-uniform vec3      u_light_position;  // Light position
-uniform vec3      u_light_intensity; // Light intensity
+uniform mat4 u_model;
+uniform mat4 u_view;
+uniform mat4 u_projection;
+uniform mat4 u_normal;
 
-varying vec3      v_normal;          // Interpolated normal (in)
-varying vec3      v_position;        // Interpolated position (in)
-varying vec2      v_texcoord;        // Interpolated fragment texture coordinates (in)
-varying vec3 v_fragpos;
-void main()
-{
-    // Calculate normal in world coordinates
-    //mat4 u_normal = inverse(u_view * u_model);
-    vec3 normal = normalize(u_normal * vec4(v_normal,1.0)).xyz;
+uniform sampler2D u_texture;
+uniform vec3 u_light_direction;
 
-    // Calculate the location of this fragment (pixel) in world coordinates
-    vec3 position = vec3(u_view*u_model * vec4(v_position, 1));
+varying vec3 v_position;
+varying vec2 v_texcoord;
+varying vec3 v_normal;
 
-    // Calculate the vector from this pixels surface to the light source
-    vec3 surfaceToLight = u_light_position - position;
-
-    // Calculate the cosine of the angle of incidence (brightness)
-    float brightness = dot(normal, surfaceToLight) /
-                      (length(surfaceToLight) * length(normal));
-    brightness = max(min(brightness,1.0),0.0);
-
-    // Calculate final color of the pixel, based on:
-    // 1. The angle of incidence: brightness
-    // 2. The color/intensities of the light: light.intensities
-    // 3. The texture and texture coord: texture(tex, fragTexCoord)
-
-    // Get texture color
+void main() {
     vec4 t_color = texture2D(u_texture, v_texcoord);
-
-    // Final color
-    if (t_color.a <= 0.001) {
+    if (t_color.a <= 0.00001) {
         discard;
     }
-    //gl_FragColor = vec4(t_color.rgb * (0.5 + 0.4*brightness * u_light_intensity), t_color.a);
-    //gl_FragColor = t_color;
 
-    gl_FragColor = vec4((v_normal + 1.0) / 2.0, 1.0);
+    // calculate normal in eye space
+    vec3 n = normalize((u_normal * vec4(v_normal, 1.0)).xyz);
 
+    // two dot products and then max out of it because
+    // I don't care so much about backsides not lit
+    float d1 = dot(n,  u_light_direction);
+    float d2 = dot(-n, u_light_direction);
+    float d = max(d1, d2);
 
-    vec3 norm = normalize(v_normal);
-    vec3 lightDir = normalize(u_light_position - v_fragpos);
+    // intensity of the light
+    // the sqrt is just a mapping how I think it looks nice
+    float intensity = min(max(d, 0.0), 1.0);
+    intensity = sqrt(intensity);
+    //gl_FragColor = vec4(vec3(intensity), 1.0);
 
-    float diff = max(dot(norm, lightDir), 0.0);
-    vec3 lightColor = vec3(1.0, 1.0, 1.0);
-    vec3 diffuse = diff * lightColor;
-
-    gl_FragColor = vec4(t_color.rgb * (0.6 + 0.4 * diffuse), t_color.a);
+    // how much is light applied
+    float alpha = 1.0;
+    gl_FragColor = vec4(t_color.rgb * (alpha * intensity + (1.0 - alpha)), t_color.a);
 }
 """
 
 FRAGMENT_COLOR = """
 uniform vec4 u_color;
+
 void main() {
     gl_FragColor = u_color;
 }
@@ -257,54 +235,71 @@ class Lines(gloo.Program):
     def __init__(self, count, vertex=VERTEX, fragment=FRAGMENT_COLOR):
         super().__init__(vertex, fragment, count=count)
 
+        self["a_position"] = gloo.VertexBuffer(np.zeros((count, 3), dtype=np.float32))
+
     def render(self, points, model, view, projection, color=(1.0, 1.0, 1.0, 1.0)):
-        self["a_position"] = points
+        if not isinstance(points[0], (tuple, list)):
+            #print("stacking", points)
+            points = np.stack(points, axis=0)
+        self["a_position"].set_data(points)
+
         self["u_model"] = model
         self["u_view"] = view
         self["u_projection"] = projection
+
         self["u_color"] = color
+
         self.draw(gloo.gl.GL_LINE_STRIP)
 
 line_program = None
 def draw_line(p0, p1, model, view, projection, color=(1.0, 1.0, 1.0, 1.0)):
     global line_program
     if line_program is None:
-        line_program = Lines(2)
+        line_program = Lines(count=2)
 
     line_program.render([p0, p1], model, view, projection, color=color)
 
 class TextureQuad(gloo.Program):
-    def __init__(self, vertex=VERTEX, fragment=FRAGMENT, texcoords=None, model=np.eye(4, dtype=np.float32), texture=None):
+    def __init__(self, vertex=VERTEX, fragment=FRAGMENT, texcoord=None, face_transform=np.eye(4, dtype=np.float32), texture=None):
         super().__init__(vertex, fragment, count=4)
 
-        if texcoords is None:
-            texcoords = [(0, 1), (0, 0), (1, 1), (1, 0)]
-
-        self["a_position"] = [(-1,-1, 0), (-1,+1, 0), (+1,-1, 0), (+1,+1, 0)]
-        self["a_texcoord"] = texcoords
-
-        # TODO
-        self["a_normal"] = np.array([0.0, 0.0, 1.0])
-        self["u_light_position"] = -1.0, 2.0, 5.0
-
         self.texture = texture
-        #self.texture.interpolation = gl.GL_LINEAR
-        self.model = model
+        self.face_transform = face_transform
 
-    def render(self, model, view, projection):
-        model = np.dot(self.model, model)
-        self["u_texture"] = self.texture
+        position = np.array([(-1,-1, 0, 1), (-1,+1, 0, 1), (+1,-1, 0, 1), (+1,+1, 0, 1)], dtype=np.float32)
+        if texcoord is None:
+            texcoord = [(0, 1), (0, 0), (1, 1), (1, 0)]
+        normal = np.array([0, 0, 1, 1], dtype=np.float32)
+        texture_dir1 = np.array([0, 1, 0, 0], dtype=np.float32)
+        texture_dir2 = np.array([1, 0, 0, 0], dtype=np.float32)
+
+        self.position = np.dot(position, face_transform)[:, :3]
+        self.normal = np.dot(normal, face_transform)[:3]
+        self.texture_dir1 = np.dot(texture_dir1, face_transform)[:3]
+        self.texture_dir2 = np.dot(texture_dir2, face_transform)[:3]
+
+        self["a_position"] = self.position
+        self["a_texcoord"] = texcoord
+        self["a_normal"] = self.normal
+
+    def render(self, model, view, projection, normal_matrix=None):
         self["u_model"] = model
         self["u_view"] = view
         self["u_projection"] = projection
-        self["u_light_position"] = -1.0, 2.0, 5.0
-        #self["u_normal"] = np.array(np.matrix(np.dot(view, np.dot(self.model, model))).I.T)
-        self.draw(gloo.gl.GL_TRIANGLE_STRIP)
+        self["u_normal"] = normal_matrix
 
-        #for x in (-1.0, 1.0):
-        #    for y in (-1.0, 1.0):
-        #        draw_line((x, y, 0), (x, y, 0.25), model, view, projection, color=(1.0, 1.0, 0.0, 1.0))
-        #draw_line((0, 0, 0.001), (0, 1, 0.001), model, view, projection, color=(1.0, 0.0, 1.0, 1.0))
+        self["u_texture"] = self.texture
+        self["u_light_direction"] = [-0.1, 1.0, 1.0]
+
+        self.draw("triangle_strip")
+
+        #for vertex in self.position:
+        #    draw_line(0.8 * vertex, 0.8 * vertex + 0.25 * self.normal, model, view, projection, color=(1.0, 1.0, 0.0, 1.0))
+
+        #center = (np.sum(self.position, axis=0) / len(self.position))[:3]
+        #center = center + self.normal * 0.01
+        #draw_line(center, center + 1.0 * self.texture_dir1, model, view, projection, color=(1.0, 0.0, 1.0, 1.0))
+        #draw_line(center, center + 0.25 * self.texture_dir2, model, view, projection, color=(1.0, 0.0, 1.0, 1.0))
 
 class Cube:
     def __init__(self, sides):
@@ -323,13 +318,14 @@ class Cube:
             #if i != 2 and i != 3:
             #    continue
             uv0, uv1 = side[1]
-            texcoords = np.array([(uv0[0], uv1[1]), uv0, uv1, (uv1[0], uv0[1])], dtype=np.float32)
+            texcoord = np.array([(uv0[0], uv1[1]), uv0, uv1, (uv1[0], uv0[1])], dtype=np.float32)
             glm.translate(transform, 0.0, 0.0, 0.0)
-            self.faces.append(TextureQuad(model=transform, texture=texture, texcoords=texcoords))
+            self.faces.append(TextureQuad(face_transform=transform, texture=texture, texcoord=texcoord))
 
     def render(self, model, view, projection):
+        normal_matrix = np.array(np.matrix(np.dot(view, model)).I.T)
         for face in self.faces:
-            face.render(model, view, projection)
+            face.render(model, view, projection, normal_matrix=normal_matrix)
 
 class Element(Cube):
     def __init__(self, elementdef, texturesdef):
