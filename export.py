@@ -3,80 +3,81 @@
 import os
 import sys
 import numpy as np
-import json
 import math
-import time
 from PIL import Image
-from glumpy import app, gl, glm, gloo, data, key
-from glumpy import transforms
+from vispy import app, gloo, io, geometry
+from glumpy import glm
 
 import mcmodel
 import render
-
-window = app.Window()
 
 w, h = 32, 32
 rotation = 0
 outdir = "out"
 
-@window.event
-def on_draw(dt):
-    window.clear()
+class Canvas(app.Canvas):
+    def __init__(self):
+        super().__init__()
 
-    model, view, projection = render.create_transform_ortho(aspect=1.0, fake_ortho=True, offscreen=True)
+        self.show()
+        self.update()
 
-    texture = np.zeros((h, w, 4), dtype=np.uint8).view(gloo.Texture2D)
-    depth = np.zeros((h, w), dtype=np.float32).view(gloo.DepthTexture)
-    fbo = gloo.FrameBuffer(color=[texture], depth=depth)
-    fbo.activate()
+        self.draw_attempt = False
 
-    gl.glViewport(0, 0, w, h)
+    def on_draw(self, event):
+        if self.draw_attempt:
+            self.close()
+        self.draw_attempt = True
+        
+        # flippying y does not seem to be required with vispy's fbo read-method
+        model, view, projection = render.create_transform_ortho(aspect=1.0, fake_ortho=True, offscreen=False)
 
-    finfo = open(os.path.join(outdir, "blocks.txt"), "w")
-    for path in sys.argv[1:]:
-        filename = os.path.basename(path)
-        blockname = filename.replace(".json", "")
-        print("Taking block %s" % blockname)
-        blockdef = mcmodel.load_blockdef(path)
-        variants = mcmodel.get_blockdef_variants(blockdef)
+        texture = gloo.Texture2D(shape=(w, h, 4))
+        depth = gloo.RenderBuffer(shape=(w, h))
+        fbo = gloo.FrameBuffer(color=texture, depth=depth)
+        fbo.activate()
 
-        glblock = render.Block(blockdef)
-        for index, variant in enumerate(variants):
-            print("Rendering variant %d/%d" % (index+1, len(variants)))
-            gl.glClearColor(0.0, 0.0, 0.0, 0.0)
-            # really clear depth buffer
-            gl.glClear(gl.GL_COLOR_BUFFER_BIT | gl.GL_DEPTH_BUFFER_BIT)
+        gloo.set_viewport(0, 0, w, h)
+        gloo.set_clear_color((0.0, 0.0, 0.0, 0.0))
+        gloo.set_state(depth_test=True, blend=True)
 
-            actual_model = np.dot(render.create_model_transform(rotation=rotation), model)
+        finfo = open(os.path.join(outdir, "blocks.txt"), "w")
+        for path in sys.argv[1:]:
+            filename = os.path.basename(path)
+            blockname = filename.replace(".json", "")
+            print("Taking block %s" % blockname)
+            blockdef = mcmodel.load_blockdef(path)
+            variants = mcmodel.get_blockdef_variants(blockdef)
 
-            #modeldef = mcmodel.load_model(sys.argv[1])
-            #glmodel = render.Model(modeldef)
-            #glmodel.render(actual_model, view, projection)
-            glblock.render(variant, actual_model, view, projection)
+            glblock = render.Block(blockdef)
+            for index, variant in enumerate(variants):
+                print("Rendering variant %d/%d" % (index+1, len(variants)))
+                gloo.clear(color=True, depth=True)
 
-            variant_name = mcmodel.encode_variant(variant)
-            if variant_name == "":
-                variant_name = "-"
-            block_filename = "%s_%d.png" % (blockname, index)
-            print("%s %s %s" % (blockname, variant_name, block_filename), file=finfo)
+                actual_model = np.dot(render.create_model_transform(rotation=rotation), model)
 
-            image = Image.fromarray(texture.get())
-            image.save(os.path.join(outdir, block_filename))
+                #modeldef = mcmodel.load_model(sys.argv[1])
+                #glmodel = render.Model(modeldef)
+                #glmodel.render(actual_model, view, projection)
+                try:
+                    glblock.render(variant, actual_model, view, projection)
+                except np.linalg.linalg.LinAlgError:
+                    print("Unable to render block %s variant %d" % (blockname, index+1))
+                    continue
 
-    finfo.close()
+                variant_name = mcmodel.encode_variant(variant)
+                if variant_name == "":
+                    variant_name = "-"
+                block_filename = "%s_%d.png" % (blockname, index)
+                print("%s %s %s" % (blockname, variant_name, block_filename), file=finfo)
 
-    fbo.deactivate()
-    window.close()
+                image = Image.fromarray(fbo.read("color"))
+                image.save(os.path.join(outdir, block_filename))
 
-@window.event
-def on_init():
-    gl.glEnable(gl.GL_DEPTH_TEST)
-    gl.glDepthFunc(gl.GL_LESS)
+        finfo.close()
+        fbo.deactivate()
+        self.close()
 
-    #gl.glEnable(gl.GL_CULL_FACE)
-    
-    gl.glEnable(gl.GL_BLEND)
-    gl.glBlendEquationSeparate(gl.GL_FUNC_ADD, gl.GL_FUNC_ADD)
-    gl.glBlendFuncSeparate(gl.GL_SRC_ALPHA, gl.GL_ONE_MINUS_SRC_ALPHA, gl.GL_ONE, gl.GL_ONE_MINUS_SRC_ALPHA)
-
-app.run()
+if __name__ == "__main__":
+    c = Canvas()
+    app.run()
