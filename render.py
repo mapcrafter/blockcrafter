@@ -122,14 +122,18 @@ attribute vec3 a_normal;
 uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_projection;
+uniform mat4 u_texcoord;
 
 varying vec3 v_position;
 varying vec2 v_texcoord;
+varying vec2 v_texcoord0;
 varying vec3 v_normal;
 
 void main() {
     v_position = a_position;
+    //v_texcoord = (u_texcoord * (vec4(a_texcoord - 0.5, 0.0, 1.0))).xy + 0.5;
     v_texcoord = a_texcoord;
+    v_texcoord0 = a_texcoord;
     v_normal = a_normal;
 
     gl_Position = u_projection * u_view * u_model * vec4(a_position, 1.0);
@@ -148,10 +152,12 @@ uniform int u_face_index;
 
 varying vec3 v_position;
 varying vec2 v_texcoord;
+varying vec2 v_texcoord0;
 varying vec3 v_normal;
 
 void main() {
     vec4 t_color = texture2D(u_texture, v_texcoord);
+    vec4 t_color0 = texture2D(u_texture, v_texcoord0);
     if (t_color.a <= 0.00001) {
         discard;
     }
@@ -173,7 +179,8 @@ void main() {
 
     // how much is light applied
     float alpha = 1.0;
-    gl_FragColor = vec4(t_color.rgb * (alpha * intensity + (1.0 - alpha)), t_color.a);
+    gl_FragColor = vec4(mix(t_color.rgb, t_color0.rgb, 0.2) * (alpha * intensity + (1.0 - alpha)), t_color.a);
+    //gl_FragColor = t_color.rgba;
 }
 """
 
@@ -277,11 +284,30 @@ def get_face_transformation(face_index):
     glm.rotate(transform, *faces[face_index])
     return transform
 
+def unit_vector(vector):
+    """ Returns the unit vector of the vector.  """
+    return vector / np.linalg.norm(vector)
+
+def angle_between(v1, v2):
+    """ Returns the angle in radians between vectors 'v1' and 'v2'::
+
+            >>> angle_between((1, 0, 0), (0, 1, 0))
+            1.5707963267948966
+            >>> angle_between((1, 0, 0), (1, 0, 0))
+            0.0
+            >>> angle_between((1, 0, 0), (-1, 0, 0))
+            3.141592653589793
+    """
+    v1_u = unit_vector(v1)
+    v2_u = unit_vector(v2)
+    return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
 class CubeFace(gloo.Program):
     def __init__(self, texture, face_index=0, texcoord=None, vertex=VERTEX, fragment=FRAGMENT):
         super().__init__(vertex, fragment, count=4)
 
         self.texture = texture
+        self.face_index = face_index
         self.face_transform = get_face_transformation(face_index)
 
         position = np.array([(-1,-1, 0, 1), (-1,+1, 0, 1), (+1,-1, 0, 1), (+1,+1, 0, 1)], dtype=np.float32)
@@ -302,24 +328,64 @@ class CubeFace(gloo.Program):
 
         self["u_face_index"] = face_index
 
-    def render(self, model, view, projection, normal_matrix=None):
+    def render(self, model, view, projection, normal_matrix=None, element_transform=None):
+        # TODO this should be the other order
+        old_model = model
+        model = np.dot(element_transform, model)
         self["u_model"] = model
         self["u_view"] = view
         self["u_projection"] = projection
         self["u_normal"] = normal_matrix
+
+        cube_transform = np.dot(element_transform, self.face_transform)
+        cube_normal = np.dot(np.array([0, 0, 1, 1], dtype=np.float32), cube_transform)[:3]
+        cube_texture_dir = np.dot(np.array([0, 1, 0, 0], dtype=np.float32), cube_transform)[:3]
+        # target more like without face_transform?
+        target = np.dot(np.array([0.0, 1.0, 0.0, 0.0], dtype=np.float32), self.face_transform)[:3]
+
+        faces = ["+x", "-x", "+y", "-y", "+z", "-z"]
+        self.texture_transform = np.eye(4, dtype=np.float32)
+        if abs(cube_normal[1]) < 0.001:
+            #print("face %s side" % faces[self.face_index])
+            target_texture_dir1 = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+            #target = np.array([0.0, 1.0, 0.0], dtype=np.float32)
+            #print("face %d is probably side texture, local normal %s, cube normal %s" % (self.face_index, np.round(self.normal), np.round(cube_normal)))
+            #print("target: %s" % target)
+            angle = math.degrees(angle_between(target, cube_texture_dir))
+            #print("angle: %s" % angle)
+            #glm.rotate(self.texture_transform, -angle, 0, 0, 1)
+        else:
+            #print("face %s top" % faces[self.face_index])
+            target_texture_dir1 = np.array([0.0, 0.0, -1.0], dtype=np.float32)
+        
+        #target_texture_dir1 = np.dot(np.append(target_texture_dir1, [0]), np.array(np.matrix(self.face_transform).I))[:3].astype(np.float32)
+        # should be now the texture dir we want (on default +z plane)
+        angle = math.degrees(angle_between(target_texture_dir1, cube_texture_dir))
+        glm.rotate(self.texture_transform, +angle, 0, 0, 1)
+        #print("texture dir should've been", np.round(target_texture_dir1))
+        #print("texture dir is", np.round(cube_texture_dir))
+        #print("angle", angle)
+
+        self["u_texcoord"] = self.texture_transform
 
         self["u_texture"] = self.texture
         self["u_light_direction"] = [-0.1, 1.0, 1.0]
 
         self.draw("triangle_strip")
 
-        #for vertex in self.position:
+        ##for vertex in self.position:
         #    draw_line(0.8 * vertex, 0.8 * vertex + 0.25 * self.normal, model, view, projection, color=(1.0, 1.0, 0.0, 1.0))
 
         #center = (np.sum(self.position, axis=0) / len(self.position))[:3]
         #center = center + self.normal * 0.01
+        
         #draw_line(center, center + 1.0 * self.texture_dir1, model, view, projection, color=(1.0, 0.0, 1.0, 1.0))
         #draw_line(center, center + 0.25 * self.texture_dir2, model, view, projection, color=(1.0, 0.0, 1.0, 1.0))
+
+        #center = center + self.normal * 0.02
+        #draw_line(center, center + 1.0 * target_texture_dir1, old_model, view, projection, color=(0.0, 1.0, 1.0, 1.0))
+
+        #draw_line((-1, -1, -1), (-1 + 0, -1 + 1, -1), old_model, view, projection, color=(1.0, 1.0, 0.0, 1.0))
 
 class Cube:
     def __init__(self, sides):
@@ -331,44 +397,168 @@ class Cube:
             self.faces.append(CubeFace(texture, face_index=i, texcoord=texcoord))
 
     def render(self, model, view, projection):
+        assert False
         normal_matrix = np.array(np.matrix(np.dot(view, model)).I.T)
         for face in self.faces:
             face.render(model, view, projection, normal_matrix=normal_matrix)
 
-class Element(Cube):
-    def __init__(self, elementdef, texturesdef):
-        super().__init__(Element.load_faces(elementdef, texturesdef))
+class Element:
 
-        self.xyz0 = (np.array(elementdef["from"]) / 16.0 * 2.0) - 1.0
-        self.xyz1 = (np.array(elementdef["to"]) / 16.0 * 2.0) - 1.0
+    CUBE_POINTS = [
+        [ 1,  1,  1],
+        [ 1,  1, -1],
+        [-1,  1, -1],
+        [-1,  1,  1],
+        [ 1, -1,  1],
+        [ 1, -1, -1],
+        [-1, -1, -1],
+        [-1, -1,  1],
+    ]
+
+    CUBE_FACES = [
+        [1, 0, 4, 5],
+        [3, 2, 6, 7],
+        [2, 3, 0, 1],
+        [7, 6, 5, 4],
+        [0, 3, 7, 4],
+        [2, 1, 5, 6],
+    ]
+
+    CUBE_TEXCOORDS = [
+        ( 1, -1),
+        (-1, -1),
+        (-1,  1),
+        ( 1,  1),
+    ]
+
+    CUBE_NORMALS = [
+        [1,  0,  0],
+        [-1, 0,  0],
+        [0,  1,  0],
+        [0, -1,  0],
+        [0,  0,  1],
+        [0,  0, -1],
+    ]
+
+    def __init__(self, elementdef, texturesdef):
+        super().__init__()
+
+        self.elementdef = elementdef
+
+        self.faces = Element.load_faces(elementdef, texturesdef)
         self.rotation = elementdef.get("rotation", None)
+
+        self.xyz0 = (np.array(elementdef["from"]) - 8.0) / 16.0 * 2.0
+        self.xyz1 = (np.array(elementdef["to"]) - 8.0) / 16.0 * 2.0
+
+        self.scale = (self.xyz1 - self.xyz0) * 0.5
+        self.translate = (self.xyz1 + self.xyz0) * 0.5
+        self.points = np.array(Element.CUBE_POINTS) * self.scale + self.translate
+        self.indices = gloo.IndexBuffer(np.array([0, 1, 2, 0, 2, 3], dtype=np.uint32))
+
+        self.program = gloo.Program(VERTEX, FRAGMENT)
+        self.program["a_position"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
+        self.program["a_normal"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
 
     @property
     def model(self):
         model = np.eye(4, dtype=np.float32)
 
+        #if self.elementdef.get("__comment", "") != "Obsidian base":
+        #    return model
+
         # apply from/to attributes
         scale = (self.xyz1 - self.xyz0) * 0.5
-        translate = (self.xyz0 + self.xyz1) / 2.0
-        glm.scale(model, scale[0], scale[1], scale[2])
-        glm.translate(model, translate[0], translate[1], translate[2])
- 
+        scalem = np.eye(4, dtype=np.float32)
+        #glm.scale(scalem, scale[0], scale[1], scale[2])
+        #glm.scale(model, scale[0], scale[1], scale[2])
+        #glm.scale(scalem, 1.0, 0.5, 1.0)
+
+        #if self.elementdef.get("__comment", "") == "Obsidian base":
+        #    glm.scale(scalem, 1.0, 0.2, 1.0)
+
+        rotationm = np.eye(4, dtype=np.float32)
         # apply rotation attributes
         if self.rotation:
             axis = {"x" : [1, 0, 0],
                     "y" : [0, 1, 0],
                     "z" : [0, 0, 1]}[self.rotation["axis"]]
             origin = (np.array(self.rotation.get("origin", [8, 8, 8]), dtype=np.float32) - 8.0) / 16.0 * 2.0
+            origin /= scale
             origin *= -1.0
-            glm.translate(model, *origin)
-            glm.rotate(model, self.rotation["angle"], *axis)
+            glm.translate(rotationm, *origin)
+            glm.rotate(rotationm, self.rotation["angle"], *axis)
             origin *= -1.0
-            glm.translate(model, *origin)
+            glm.translate(rotationm, *origin)
 
+        translate = ((self.xyz0 + self.xyz1) / 2.0) / scale
+        translatem = np.eye(4, dtype=np.float32)
+        glm.translate(translatem, translate[0], translate[1], translate[2])
+        #print("scale: ", scale, "translate:", translate)
+
+        print(self.elementdef)
+        print("scale:", scale)
+        print("translate:", translate)
+        print("translate actually:", ((self.xyz0 + self.xyz1) / 2.0))
+        print("---")
+
+        return np.dot(rotationm, np.dot(translatem, scalem))
         return model
 
-    def render(self, model, view, projection):
-        super().render(np.dot(self.model, model), view, projection)
+    def render_face(self, face_index, texture, uvs, model, view, projection):
+        program = self.program
+
+        points = self.points[Element.CUBE_FACES[face_index]].astype(np.float32)
+        program["a_position"].set_data(points)
+        normals = np.array(4 * [Element.CUBE_NORMALS[face_index]], dtype=np.float32)
+        program["a_normal"].set_data(normals)
+
+        uv0, uv1 = uvs
+        scale = (uv1 - uv0) * 0.5
+        translate = (uv1 + uv0) * 0.5
+        program["a_texcoord"] = np.array(Element.CUBE_TEXCOORDS, dtype=np.float32) * scale + translate
+
+        program["u_texture"] = texture
+        program["u_light_direction"] = [-0.1, 1.0, 1.0]
+
+        program.draw("triangles", self.indices)
+
+    def render(self, model, view, projection, element_transform=np.eye(4, dtype=np.float32)):
+        #super().render(np.dot(self.model, model), view, projection)
+
+        #element_transform = np.dot(element_transform, self.model)
+        #element_transform = self.model
+
+        #model_view = np.dot(view, np.dot(model, element_transform))
+        #normal_matrix = np.array(np.matrix(model_view).I.T)
+        #for face in self.faces:
+        #    face.render(model, view, projection, normal_matrix=normal_matrix, element_transform=element_transform)
+
+        rotation = np.eye(4, dtype=np.float32)
+        if "rotation" in self.elementdef:
+            rotationdef = self.elementdef["rotation"]
+            axis = {"x" : [1, 0, 0],
+                    "y" : [0, 1, 0],
+                    "z" : [0, 0, 1]}[rotationdef["axis"]]
+            origin = (np.array(rotationdef.get("origin", [8, 8, 8]), dtype=np.float32) - 8.0) / 16.0 * 2.0
+            origin *= -1.0
+            glm.translate(rotation, *origin)
+            glm.rotate(rotation, rotationdef["angle"], *axis)
+            origin *= -1.0
+            glm.translate(rotation, *origin)
+
+        program = self.program
+
+        complete_model = np.dot(np.dot(rotation, element_transform), model)
+        program["u_model"] = complete_model
+        program["u_view"] = view
+        program["u_projection"] = projection
+        program["u_normal"] = np.array(np.matrix(np.dot(view, complete_model)).I.T)
+
+        for i, (texture, uvs) in enumerate(self.faces):
+            if texture is None:
+                continue
+            self.render_face(i, texture, uvs, model, view, projection)
 
     @staticmethod
     def load_faces(elementdef, texturesdef):
@@ -389,12 +579,13 @@ class Element(Cube):
                 raise RuntimeError("Face in direction '%s' has no texture associated" % direction)
             uvs = np.array(facedef.get("uv", [0, 0, 16, 16]), dtype=np.float32) / 16.0
             uv0, uv1 = uvs[:2], uvs[2:]
-            faces[direction] = (io.imread(path), (uv0, uv1))
+            faces[direction] = (gloo.Texture2D(data=io.imread(path)), (uv0, uv1))
 
         # gather faces in order for cube sides
         sides = [ faces.get(direction, None) for direction in mc_to_opengl ]
         # get first side that is not empty
-        empty = (np.zeros((1, 1, 4), dtype=np.uint8), ((0, 0), (16, 16)))
+        #empty = (np.zeros((1, 1, 4), dtype=np.uint8), ((0, 0), (16, 16)))
+        empty = (None, None)
         sides = [ (s if s is not None else empty) for s in sides ]
         assert len(sides) == 6
         return sides
@@ -411,14 +602,14 @@ class Model:
             glm.rotate(m, modelref["x"], 1, 0, 0)
         if "y" in modelref:
             glm.rotate(m, modelref["y"], 0, 1, 0)
-        model = np.dot(m, model)
+        #model = np.dot(m, model)
 
         if "uvlock" in modelref:
             # TODO
             pass
 
         for element in self.elements:
-            element.render(model, view, projection)
+            element.render(model, view, projection, element_transform=m)
 
 class Block:
     def __init__(self, blockdef):

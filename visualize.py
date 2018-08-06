@@ -61,8 +61,10 @@ class Canvas(app.Canvas):
 
         if event.key == "Down":
             self.variant_index = (self.variant_index - 1) % len(variants)
+            print("Rendering variant %d: %s" % (self.variant_index, variants[self.variant_index]))
         if event.key == "Up":
             self.variant_index = (self.variant_index + 1) % len(variants)
+            print("Rendering variant %d: %s" % (self.variant_index, variants[self.variant_index]))
 
         if event.key == "Space":
             self.run_phi = not self.run_phi
