@@ -52,27 +52,21 @@ class Canvas(app.Canvas):
             glblock = render.Block(blockdef)
             for index, variant in enumerate(variants):
                 print("Rendering variant %d/%d" % (index+1, len(variants)))
-                gloo.clear(color=True, depth=True)
-
-                actual_model = np.dot(render.create_model_transform(rotation=rotation), model)
-
-                #modeldef = mcmodel.load_model(sys.argv[1])
-                #glmodel = render.Model(modeldef)
-                #glmodel.render(actual_model, view, projection)
-                try:
-                    glblock.render(variant, actual_model, view, projection)
-                except np.linalg.linalg.LinAlgError:
-                    print("Unable to render block %s variant %d" % (blockname, index+1))
-                    continue
 
                 variant_name = mcmodel.encode_variant(variant)
                 if variant_name == "":
                     variant_name = "-"
-                block_filename = "%s_%d.png" % (blockname, index)
-                print("%s %s %s" % (blockname, variant_name, block_filename), file=finfo)
+                block_filename = "%s_%d" % (blockname, index)
+                for mode in ("color", "uv"):
+                    gloo.clear(color=True, depth=True)
 
-                image = Image.fromarray(fbo.read("color"))
-                image.save(os.path.join(outdir, block_filename))
+                    actual_model = np.dot(render.create_model_transform(rotation=rotation), model)
+
+                    glblock.render(variant, actual_model, view, projection, mode=mode)
+
+                    image = Image.fromarray(fbo.read("color"))
+                    image.save(os.path.join(outdir, "%s_%s.png" % (block_filename, mode)))
+                print("%s %s %s %s" % (blockname, variant_name, block_filename + "_color.png", block_filename + "_uv.png"), file=finfo)
 
         finfo.close()
         fbo.deactivate()
