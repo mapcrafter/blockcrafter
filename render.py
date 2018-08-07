@@ -4,7 +4,7 @@ import math
 import time
 from PIL import Image
 from vispy import app, gloo, io, geometry
-from glumpy import glm
+from vispy.util import transforms
 
 import mcmodel
 
@@ -281,9 +281,7 @@ class Element:
             if direction < 0:
                 angle = 360 - angle
 
-            texture_transform = np.eye(4, dtype=np.float32)
-            glm.rotate(texture_transform, angle, 0, 0, 1)
-            program["u_texcoord"] = texture_transform
+            program["u_texcoord"] = transforms.rotate(angle, (0, 0, 1))
         else:
             program["u_texcoord"] = np.eye(4, dtype=np.float32)
 
@@ -326,11 +324,7 @@ class Element:
                     "y" : [0, 1, 0],
                     "z" : [0, 0, 1]}[rotationdef["axis"]]
             origin = (np.array(rotationdef.get("origin", [8, 8, 8]), dtype=np.float32) - 8.0) / 16.0 * 2.0
-            origin *= -1.0
-            glm.translate(rotation, *origin)
-            glm.rotate(rotation, rotationdef["angle"], *axis)
-            origin *= -1.0
-            glm.translate(rotation, *origin)
+            rotation = np.dot(transforms.translate(-origin), np.dot(transforms.rotate(rotationdef["angle"], axis), transforms.translate(origin)))
 
         self.current_program = {
             "color" : self.color_program,
@@ -338,7 +332,7 @@ class Element:
         }[mode]
         program = self.current_program
 
-        # add rotation of world (only 90*x degrees) to element transformation
+        # add rotation of element to element transformation
         element_transform = np.dot(rotation, element_transform)
         complete_model = np.dot(element_transform, model)
         program["u_model"] = complete_model
@@ -390,10 +384,10 @@ class Model:
     def render(self, model, view, projection, mode="color", modelref={}, rotation=0):
         m = np.eye(4, dtype=np.float32)
         if "x" in modelref:
-            glm.rotate(m, modelref["x"], 1, 0, 0)
+            m = np.dot(m, transforms.rotate(modelref["x"], (1, 0, 0)))
         if "y" in modelref:
-            glm.rotate(m, modelref["y"], 0, 1, 0)
-        glm.rotate(m, rotation * 90, 0, 1, 0)
+            m = np.dot(m, transforms.rotate(modelref["y"], (0, 1, 0)))
+        m = np.dot(m, transforms.rotate(rotation * 90, (0, 1, 0)))
 
         uvlock = modelref.get("uvlock", False)
         for element in self.elements:
@@ -431,42 +425,27 @@ class Block:
             glmodel = self.models[modelref["model"]]
             glmodel.render(model, view, projection, mode=mode, modelref=modelref, rotation=rotation)
 
-def create_transform_ortho(aspect=1.0, offscreen=False, fake_ortho=True):
+def create_transform_ortho(aspect=1.0, fake_ortho=True):
     model = np.eye(4, dtype=np.float32)
     if fake_ortho:
         # 0.816479 = 0.5 * sqrt(3) * x = 0.5 * sqrt(2)
-        # scale of y-axis to make sides and top of same height
-        glm.scale(model, 1.0, 0.816479, 1.0)
-        # scale to get block completely into viewport (-1;1)
-        glm.scale(model, 1.0 / math.sqrt(2))
+        # scale of y-axis to make sides and top of same height: (1.0, 0.81649, 1.0)
+        # scale to get block completely into viewport (-1;1): (1.0 / math.sqrt(2), ..., ...)
+        model = np.dot(model, transforms.scale((1.0 / math.sqrt(2), 0.816479 / math.sqrt(2), 1.0 / math.sqrt(2))))
     else:
-        glm.scale(model, 0.5)
-    glm.rotate(model, 45, 0, 1, 0)
-    glm.rotate(model, 30, 1, 0, 0)
+        model = np.dot(model, transforms.scale((0.5, 0.5, 0.5)))
 
-    view = glm.translation(0, 0, -5)
-
-    projection = glm.ortho(-aspect, aspect, -1, 1, 2.0, 50.0)
-    if offscreen:
-        glm.scale(projection, 1.0, -1.0, 1.0)
-
+    model = np.dot(model, np.dot(transforms.rotate(45, (0, 1, 0)), transforms.rotate(30, (1, 0, 0))))
+    view = transforms.translate((0, 0, -5))
+    projection = transforms.ortho(-aspect, aspect, -1, 1, 2.0, 50.0)
     return model, view, projection
 
-def create_transform_perspective(aspect=1.0, offscreen=False):
-    model = np.eye(4, dtype=np.float32)
-    glm.rotate(model, 45, 0, 1, 0)
-    glm.rotate(model, 25, 1, 0, 0)
-
-    view = glm.translation(0, 0, -5)
-
-    projection = glm.perspective(45.0, aspect, 2.0, 50.0)
-    if offscreen:
-        glm.scale(projection, 1.0, -1.0, 1.0)
-
+def create_transform_perspective(aspect=1.0):
+    model = np.dot(transforms.rotate(45, (0, 1, 0)), transforms.rotate(25, (1, 0, 0)))
+    view = transforms.translate((0, 0, -5))
+    projection = transforms.perspective(45.0, aspect, 2.0, 50.0)
     return model, view, projection
 
 def create_model_transform(rotation=0, phi=0.0):
-    model = np.eye(4, dtype=np.float32)
-    glm.rotate(model, rotation * 90 + phi, 0, 1, 0)
-    return model
+    return transforms.rotate(rotation * 90 + phi, (0, 1, 0))
 

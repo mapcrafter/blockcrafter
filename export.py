@@ -6,7 +6,6 @@ import numpy as np
 import math
 from PIL import Image
 from vispy import app, gloo, io, geometry
-from glumpy import glm
 
 import mcmodel
 import render
@@ -28,9 +27,8 @@ class Canvas(app.Canvas):
         if self.draw_attempt:
             self.close()
         self.draw_attempt = True
-        
-        # flippying y does not seem to be required with vispy's fbo read-method
-        model, view, projection = render.create_transform_ortho(aspect=1.0, fake_ortho=True, offscreen=False)
+
+        model, view, projection = render.create_transform_ortho(aspect=1.0, fake_ortho=True)
 
         texture = gloo.Texture2D(shape=(w, h, 4))
         depth = gloo.RenderBuffer(shape=(w, h))
@@ -43,6 +41,9 @@ class Canvas(app.Canvas):
 
         finfo = open(os.path.join(outdir, "blocks.txt"), "w")
         for path in sys.argv[1:]:
+            if path.startswith("-"):
+                continue
+
             filename = os.path.basename(path)
             blockname = filename.replace(".json", "")
             print("Taking block %s" % blockname)
@@ -73,5 +74,10 @@ class Canvas(app.Canvas):
         self.close()
 
 if __name__ == "__main__":
+    import vispy
+    if "--osmesa" in sys.argv[1:]:
+        vispy.use("osmesa")
+        assert vispy.app.use_app().backend_name == "osmesa"
+
     c = Canvas()
     app.run()
