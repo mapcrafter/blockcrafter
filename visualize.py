@@ -98,7 +98,7 @@ class Canvas(app.Canvas):
         rotation = self.rotation_index
         if self.run_phi:
             self.phi += 0.2
-        actual_model = np.dot(render.create_model_transform(rotation, self.phi), self.model)
+        actual_model = np.dot(render.create_model_transform(0, self.phi), self.model)
 
         current_variant = variants[self.variant_index]
         glblock.render(current_variant, actual_model, self.view, self.projection, rotation=rotation)

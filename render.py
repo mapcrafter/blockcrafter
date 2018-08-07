@@ -131,8 +131,8 @@ varying vec3 v_normal;
 
 void main() {
     v_position = a_position;
-    //v_texcoord = (u_texcoord * (vec4(a_texcoord - 0.5, 0.0, 1.0))).xy + 0.5;
-    v_texcoord = a_texcoord;
+
+    v_texcoord = (u_texcoord * (vec4(a_texcoord - 0.5, 0.0, 1.0))).xy + 0.5;
     v_texcoord0 = a_texcoord;
     v_normal = a_normal;
 
@@ -181,6 +181,7 @@ void main() {
     float alpha = 1.0;
     gl_FragColor = vec4(mix(t_color.rgb, t_color0.rgb, 0.2) * (alpha * intensity + (1.0 - alpha)), t_color.a);
     //gl_FragColor = t_color.rgba;
+    //gl_FragColor = vec4(v_texcoord.xy, 0.0, 1.0);
 }
 """
 
@@ -418,8 +419,8 @@ class Element:
     CUBE_FACES = [
         [1, 0, 4, 5],
         [3, 2, 6, 7],
-        [2, 3, 0, 1],
-        [7, 6, 5, 4],
+        [0, 1, 2, 3],
+        [4, 5, 6, 7],
         [0, 3, 7, 4],
         [2, 1, 5, 6],
     ]
@@ -438,6 +439,15 @@ class Element:
         [0, -1,  0],
         [0,  0,  1],
         [0,  0, -1],
+    ]
+
+    CUBE_TEXTURE_DIRS = [
+        [0, 1, 0],
+        [0, 1, 0],
+        [1, 0, 0],
+        [1, 0, 0],
+        [0, 1, 0],
+        [0, 1, 0],
     ]
 
     def __init__(self, elementdef, texturesdef):
@@ -505,13 +515,13 @@ class Element:
         return np.dot(rotationm, np.dot(translatem, scalem))
         return model
 
-    def render_face(self, face_index, texture, uvs, model, view, projection):
+    def render_face(self, face_index, texture, uvs, model, view, projection, element_transform, uvlock):
         program = self.program
 
         points = self.points[Element.CUBE_FACES[face_index]].astype(np.float32)
+        normal = np.array(Element.CUBE_NORMALS[face_index], dtype=np.float32)
         program["a_position"].set_data(points)
-        normals = np.array(4 * [Element.CUBE_NORMALS[face_index]], dtype=np.float32)
-        program["a_normal"].set_data(normals)
+        program["a_normal"].set_data(np.stack([normal] * 4))
 
         uv0, uv1 = uvs
         scale = (uv1 - uv0) * 0.5
@@ -521,9 +531,47 @@ class Element:
         program["u_texture"] = texture
         program["u_light_direction"] = [-0.1, 1.0, 1.0]
 
+        texture_dir = np.array(Element.CUBE_TEXTURE_DIRS[face_index], dtype=np.float32)
+        target_texture_dir = None
+        cube_normal = np.round(np.dot(np.append(normal, [0]), element_transform)[:3])
+        cube_texture_dir = np.round(np.dot(np.append(texture_dir, [0]), element_transform)[:3])
+        #print(face_index, cube_normal)
+        faces = ["+x", "-x", "+y", "-y", "+z", "-z"]
+
+        if abs(cube_normal[1]) > 0.001:
+            #print(faces[face_index], "probably top")
+            target_texture_dir = np.array(Element.CUBE_TEXTURE_DIRS[2], dtype=np.float32)
+        else:
+            #print(faces[face_index], "probably side")
+            target_texture_dir = np.array(Element.CUBE_TEXTURE_DIRS[0], dtype=np.float32)
+        element_transform_inv = np.array(np.matrix(element_transform).I)
+        cube_target_texture_dir = np.round(np.dot(np.append(target_texture_dir, [0]), element_transform_inv)[:3]).astype(np.float32)
+
+        angle = np.round(math.degrees(angle_between(texture_dir, cube_target_texture_dir)))
+        direction = np.dot(np.cross(normal, texture_dir), cube_target_texture_dir)
+        #direction = 1 if direction > 0 else -1
+        if direction < 0:
+            angle = 360 - angle
+        if uvlock:
+            texture_transform = np.eye(4, dtype=np.float32)
+            glm.rotate(texture_transform, angle, 0, 0, 1)
+            program["u_texcoord"] = texture_transform
+            #print(faces[face_index], angle)
+            #print(texture_dir, cube_target_texture_dir)
+        else:
+            program["u_texcoord"] = np.eye(4, dtype=np.float32)
+
         program.draw("triangles", self.indices)
 
-    def render(self, model, view, projection, element_transform=np.eye(4, dtype=np.float32)):
+        #print(faces[face_index], texture_dir)
+
+        #center = np.sum(points, axis=0) / len(points) + 0.001 * normal
+        #draw_line(center, center + normal * 0.5, model, view, projection, (1.0, 1.0, 0.0, 1.0))
+        #draw_line(center, center + texture_dir * 0.5, model, view, projection, (0.0, 1.0, 1.0, 1.0))
+        #center += 0.005 * normal
+        #draw_line(center, center + cube_target_texture_dir * 0.5, model, view, projection, (0.0, 1.0, 0.0, 1.0))
+
+    def render(self, model, view, projection, element_transform=np.eye(4, dtype=np.float32), uvlock=False):
         #super().render(np.dot(self.model, model), view, projection)
 
         #element_transform = np.dot(element_transform, self.model)
@@ -548,8 +596,9 @@ class Element:
             glm.translate(rotation, *origin)
 
         program = self.program
-
-        complete_model = np.dot(np.dot(rotation, element_transform), model)
+        
+        element_transform = np.dot(rotation, element_transform)
+        complete_model = np.dot(element_transform, model)
         program["u_model"] = complete_model
         program["u_view"] = view
         program["u_projection"] = projection
@@ -558,7 +607,7 @@ class Element:
         for i, (texture, uvs) in enumerate(self.faces):
             if texture is None:
                 continue
-            self.render_face(i, texture, uvs, model, view, projection)
+            self.render_face(i, texture, uvs, complete_model, view, projection, element_transform=element_transform, uvlock=uvlock)
 
     @staticmethod
     def load_faces(elementdef, texturesdef):
@@ -602,11 +651,9 @@ class Model:
             glm.rotate(m, modelref["x"], 1, 0, 0)
         if "y" in modelref:
             glm.rotate(m, modelref["y"], 0, 1, 0)
-        #model = np.dot(m, model)
+        glm.rotate(m, rotation * 90, 0, 1, 0)
 
-        if "uvlock" in modelref:
-            # TODO
-            pass
+        uvlock = modelref.get("uvlock", False)
 
         for element in self.elements:
             element.render(model, view, projection, element_transform=m)
