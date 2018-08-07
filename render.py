@@ -35,7 +35,7 @@ void main() {
 }
 """
 
-FRAGMENT = """
+FRAGMENT_BLOCK_COLOR = """
 uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_projection;
@@ -80,7 +80,7 @@ void main() {
 }
 """
 
-FRAGMENT_TEXCOORD = """
+FRAGMENT_BLOCK_UV = """
 uniform mat4 u_model;
 uniform mat4 u_view;
 uniform mat4 u_projection;
@@ -104,8 +104,7 @@ void main() {
 }
 """
 
-
-FRAGMENT_COLOR = """
+FRAGMENT_LINE_COLOR = """
 uniform vec4 u_color;
 
 void main() {
@@ -114,7 +113,7 @@ void main() {
 """
 
 class Lines(gloo.Program):
-    def __init__(self, count, vertex=VERTEX, fragment=FRAGMENT_COLOR):
+    def __init__(self, count, vertex=VERTEX, fragment=FRAGMENT_LINE_COLOR):
         super().__init__(vertex, fragment, count=count)
 
         self["a_position"] = gloo.VertexBuffer(np.zeros((count, 3), dtype=np.float32))
@@ -221,12 +220,20 @@ class Element:
         self.points = np.array(Element.CUBE_POINTS) * self.scale + self.translate
         self.indices = gloo.IndexBuffer(np.array([0, 1, 2, 0, 2, 3], dtype=np.uint32))
 
-        self.program = gloo.Program(VERTEX, FRAGMENT)
-        self.program["a_position"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
-        self.program["a_normal"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
+        self.color_program = gloo.Program(VERTEX, FRAGMENT_BLOCK_COLOR)
+        self.uv_program = gloo.Program(VERTEX, FRAGMENT_BLOCK_UV)
+        self.current_program = None
+
+        for program in (self.color_program, self.uv_program):
+            program["a_position"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
+            program["a_normal"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
 
     def render_face(self, face_index, texture, uvs, model, view, projection, element_transform, uvlock):
-        program = self.program
+        program = self.current_program
+
+        # ---
+        # --- set up attributes ---#
+        # ---
 
         points = self.points[Element.CUBE_FACES[face_index]].astype(np.float32)
         normal = np.array(Element.CUBE_NORMALS[face_index], dtype=np.float32)
@@ -238,8 +245,11 @@ class Element:
         translate = (uv1 + uv0) * 0.5
         program["a_texcoord"] = np.array(Element.CUBE_TEXCOORDS, dtype=np.float32) * scale + translate
 
-        program["u_texture"] = texture
-        program["u_light_direction"] = [-0.1, 1.0, 1.0]
+        # ---
+        # --- set up uniforms ###
+        # ---
+
+        # we need to do some transformation magic to handle uvlock correctly
 
         # actual texture dir in model coordinates
         texture_dir = np.array(Element.CUBE_TEXTURE_DIRS[face_index], dtype=np.float32)
@@ -248,34 +258,58 @@ class Element:
         # but actually I mean the model coordinates after element is rotated by element/block
 
         # get the face normal in world coordinates to determine where texture should point to
-        target_texture_dir = None
+        # (that face normal in world coordinates describes as which face actually this face appears to viewer)
         cube_normal = np.round(np.dot(np.append(normal, [0]), element_transform)[:3])
-        if abs(cube_normal[1]) > 0.001:
-            # top face, should point to east
-            target_texture_dir = np.array(Element.CUBE_TEXTURE_DIRS[2], dtype=np.float32)
-        else:
-            # side face, should point to top
-            target_texture_dir = np.array(Element.CUBE_TEXTURE_DIRS[0], dtype=np.float32)
-        # go from world -> model
-        element_transform_inv = np.array(np.matrix(element_transform).I)
-        target_texture_dir = np.round(np.dot(np.append(target_texture_dir, [0]), element_transform_inv)[:3]).astype(np.float32)
 
-        # now we can get the angle we have to rotate the texture
-        angle = np.round(math.degrees(angle_between(texture_dir, target_texture_dir)))
-        # also get a direction related to face normal
-        direction = np.dot(np.cross(normal, texture_dir), target_texture_dir)
-        if direction < 0:
-            angle = 360 - angle
         # if uvlock is wanted, apply correction now to texture
         if uvlock:
+            target_texture_dir = None
+            if abs(cube_normal[1]) > 0.001:
+                # top face, should point to east
+                target_texture_dir = np.array(Element.CUBE_TEXTURE_DIRS[2], dtype=np.float32)
+            else:
+                # side face, should point to top
+                target_texture_dir = np.array(Element.CUBE_TEXTURE_DIRS[0], dtype=np.float32)
+            # go from world -> model
+            element_transform_inv = np.array(np.matrix(element_transform).I)
+            target_texture_dir = np.round(np.dot(np.append(target_texture_dir, [0]), element_transform_inv)[:3]).astype(np.float32)
+
+            # now we can get the angle we have to rotate the texture
+            angle = np.round(math.degrees(angle_between(texture_dir, target_texture_dir)))
+            # also get a direction related to face normal
+            direction = np.dot(np.cross(normal, texture_dir), target_texture_dir)
+            if direction < 0:
+                angle = 360 - angle
+
             texture_transform = np.eye(4, dtype=np.float32)
             glm.rotate(texture_transform, angle, 0, 0, 1)
             program["u_texcoord"] = texture_transform
         else:
             program["u_texcoord"] = np.eye(4, dtype=np.float32)
+
+        program["u_texture"] = texture
+        program["u_light_direction"] = [-0.1, 1.0, 1.0]
+        
+        # we pass index of face to shader too
+        # (mostly for the shader that exports uv coordinates)
+        if uvlock:
+            # find face index if element wouldn't be rotated (as which face it appears to viewer)
+            # faces rotated not by x*90 degrees just get face index 6
+            actual_face = 6
+            for i in range(6):
+                if np.allclose(Element.CUBE_NORMALS[i], cube_normal):
+                    actual_face = i
+                    break
+            program["u_face_index"] = actual_face
+        else:
+            program["u_face_index"] = face_index
+
+        # ---
+        # --- actual drawing ---
+        # ---
         program.draw("triangles", self.indices)
 
-        # code to debug normals / texture direction stuff
+        # old code to debug normals / texture direction stuff
         #center = np.sum(points, axis=0) / len(points) + 0.001 * normal
         #draw_line(center, center + normal * 0.5, model, view, projection, (1.0, 1.0, 0.0, 1.0))
         #draw_line(center, center + texture_dir * 0.5, model, view, projection, (0.0, 1.0, 1.0, 1.0))
@@ -284,7 +318,7 @@ class Element:
         #if direction < 0:
         #    draw_line(center, center + normal * 0.25, model, view, projection, (1.0, 0.0, 0.0, 1.0))
 
-    def render(self, model, view, projection, element_transform=np.eye(4, dtype=np.float32), uvlock=False):
+    def render(self, model, view, projection, mode="color", element_transform=np.eye(4, dtype=np.float32), uvlock=False):
         rotation = np.eye(4, dtype=np.float32)
         if "rotation" in self.elementdef:
             rotationdef = self.elementdef["rotation"]
@@ -298,7 +332,11 @@ class Element:
             origin *= -1.0
             glm.translate(rotation, *origin)
 
-        program = self.program
+        self.current_program = {
+            "color" : self.color_program,
+            "uv" : self.uv_program,
+        }[mode]
+        program = self.current_program
 
         # add rotation of world (only 90*x degrees) to element transformation
         element_transform = np.dot(rotation, element_transform)
@@ -311,7 +349,7 @@ class Element:
         for i, (texture, uvs) in enumerate(self.faces):
             if texture is None:
                 continue
-            self.render_face(i, texture, uvs, complete_model, view, projection, element_transform=element_transform, uvlock=uvlock)
+            self.render_face(i, texture, uvs, complete_model, view, projection, element_transform=element_transform, uvlock=uvlock or mode == "uv")
 
     @staticmethod
     def load_faces(elementdef, texturesdef):
@@ -349,7 +387,7 @@ class Model:
         for elementdef in modeldef["elements"]:
             self.elements.append(Element(elementdef, modeldef["textures"]))
 
-    def render(self, model, view, projection, modelref={}, rotation=0):
+    def render(self, model, view, projection, mode="color", modelref={}, rotation=0):
         m = np.eye(4, dtype=np.float32)
         if "x" in modelref:
             glm.rotate(m, modelref["x"], 1, 0, 0)
@@ -359,7 +397,7 @@ class Model:
 
         uvlock = modelref.get("uvlock", False)
         for element in self.elements:
-            element.render(model, view, projection, element_transform=m, uvlock=uvlock)
+            element.render(model, view, projection, mode=mode, element_transform=m, uvlock=uvlock)
 
 class Block:
     def __init__(self, blockdef):
@@ -383,7 +421,7 @@ class Block:
             modelrefs.append(modelref)
         return modelrefs
 
-    def render(self, variant, model, view, projection, rotation=0):
+    def render(self, variant, model, view, projection, mode="color", rotation=0):
         variant_str = mcmodel.encode_variant(variant)
         if variant_str not in self.variants:
             self.variants[variant_str] = self._load_variant(variant)
@@ -391,7 +429,7 @@ class Block:
         modelrefs = self.variants[variant_str]
         for modelref in modelrefs:
             glmodel = self.models[modelref["model"]]
-            glmodel.render(model, view, projection, modelref=modelref, rotation=rotation)
+            glmodel.render(model, view, projection, mode=mode, modelref=modelref, rotation=rotation)
 
 def create_transform_ortho(aspect=1.0, offscreen=False, fake_ortho=True):
     model = np.eye(4, dtype=np.float32)

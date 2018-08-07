@@ -17,6 +17,7 @@ for variant in variants:
 
 views = ["perspective", "ortho", "fake_ortho"]
 rotations = ["top-left", "top-right", "bottom-right", "bottom-left"]
+modes = ["color", "uv"]
 
 class Canvas(app.Canvas):
     def __init__(self):
@@ -30,6 +31,7 @@ class Canvas(app.Canvas):
         self.variant_index = 0
         self.view_index = 0
         self.rotation_index = 0
+        self.mode_index = 0
 
         #gloo.gl.glEnable(gloo.gl.GL_DEPTH_TEST)
         #gloo.gl.glDepthFunc(gloo.gl.GL_LESS)
@@ -49,7 +51,7 @@ class Canvas(app.Canvas):
         gloo.set_viewport(0, 0, w, h)
 
     def on_key_press(self, event):
-        if event.key == "V":
+        if event.key == "v":
             self.view_index = (self.view_index + 1) % len(views)
             self.model, self.view, self.projection = None, None, None
 
@@ -65,6 +67,9 @@ class Canvas(app.Canvas):
         if event.key == "Up":
             self.variant_index = (self.variant_index + 1) % len(variants)
             print("Rendering variant %d: %s" % (self.variant_index, variants[self.variant_index]))
+
+        if event.key == "m":
+            self.mode_index = (self.mode_index + 1) % len(modes)
 
         if event.key == "Space":
             self.run_phi = not self.run_phi
@@ -101,7 +106,8 @@ class Canvas(app.Canvas):
         actual_model = np.dot(render.create_model_transform(0, self.phi), self.model)
 
         current_variant = variants[self.variant_index]
-        glblock.render(current_variant, actual_model, self.view, self.projection, rotation=rotation)
+        current_mode = modes[self.mode_index]
+        glblock.render(current_variant, actual_model, self.view, self.projection, mode=current_mode, rotation=rotation)
 
         v = lambda *a: np.array(a, dtype=np.float32)
         render.draw_line(v(0, 0, 0), v(10, 0, 0), actual_model, self.view, self.projection, color=(1, 0, 0, 1))
