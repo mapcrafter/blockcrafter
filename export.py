@@ -10,6 +10,8 @@ from vispy import app, gloo, io, geometry
 import mcmodel
 import render
 
+assetdir = "assets"
+#assetdir = "/home/moritz/.minecraft/versions/1.13/1.13.jar"
 w, h = 32, 32
 rotation = 0
 outdir = "out"
@@ -40,24 +42,19 @@ class Canvas(app.Canvas):
         gloo.set_state(depth_test=True, blend=True)
 
         finfo = open(os.path.join(outdir, "blocks.txt"), "w")
-        for path in sys.argv[1:]:
-            if path.startswith("-"):
-                continue
 
-            filename = os.path.basename(path)
-            blockname = filename.replace(".json", "")
-            print("Taking block %s" % blockname)
-            blockdef = mcmodel.load_blockdef(path)
-            variants = mcmodel.get_blockdef_variants(blockdef)
+        assets = mcmodel.Assets(assetdir)
+        for blockstate in assets.blockstates:
+            print("Taking block %s" % blockstate.name)
 
-            glblock = render.Block(blockdef)
-            for index, variant in enumerate(variants):
-                print("Rendering variant %d/%d" % (index+1, len(variants)))
+            glblock = render.Block(blockstate)
+            for index, variant in enumerate(blockstate.variants):
+                print("Rendering variant %d/%d" % (index+1, len(blockstate.variants)))
 
                 variant_name = mcmodel.encode_variant(variant)
                 if variant_name == "":
                     variant_name = "-"
-                block_filename = "%s_%d" % (blockname, index)
+                block_filename = "%s_%d" % (blockstate.name, index)
                 for mode in ("color", "uv"):
                     gloo.clear(color=True, depth=True)
 
@@ -67,7 +64,7 @@ class Canvas(app.Canvas):
 
                     image = Image.fromarray(fbo.read("color"))
                     image.save(os.path.join(outdir, "%s_%s.png" % (block_filename, mode)))
-                print("%s %s %s %s" % (blockname, variant_name, block_filename + "_color.png", block_filename + "_uv.png"), file=finfo)
+                print("%s %s %s %s" % (blockstate.name, variant_name, block_filename + "_color.png", block_filename + "_uv.png"), file=finfo)
 
         finfo.close()
         fbo.deactivate()

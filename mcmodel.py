@@ -2,7 +2,10 @@
 
 import sys
 import os
+import glob
 import json
+import zipfile
+import fnmatch
 import itertools
 
 # okay, first some termini:
@@ -12,59 +15,264 @@ import itertools
 # blockdef: json structure like models/*.json
 # variant: a dictionary showing mapping of values to variables
 
-BASE = os.path.join(os.path.abspath(os.path.dirname(__file__)), "assets/minecraft")
-MODEL_BASE = os.path.join(BASE, "models")
-TEXTURE_BASE = os.path.join(BASE, "textures")
+class DirectorySource:
+    def __init__(self, path):
+        self.path = path
 
-model_cache = {}
-def load_modeldef(path):
-    global model_cache
-    if path in model_cache:
-        return model_cache[path]
+    def glob_files(self, wildcard):
+        return [ os.path.relpath(p, self.path) for p in glob.glob(os.path.join(self.path, wildcard)) ]
 
-    m = json.load(open(path))
+    def open_file(self, path, mode="r"):
+        return open(os.path.join(self.path, path), mode)
 
-    textures = {}
-    elements = {}
+    def load_file(self, path):
+        f = self.open_file(path)
+        data = f.read()
+        f.close()
+        return data
 
-    if "parent" in m:
-        parent = load_modeldef(os.path.join(MODEL_BASE, m["parent"] + ".json"))
-        textures.update(parent["textures"])
-        if "elements" in parent:
-            elements = parent["elements"]
+class JarFileSource:
+    def __init__(self, path):
+        self.zip = zipfile.ZipFile(path)
 
-    textures.update(m.get("textures", {}))
-    if "elements" in m:
-        elements = m["elements"]
+    def glob_files(self, wildcard):
+        wildcard = "assets/" + wildcard
+        files = []
+        for path in self.zip.namelist():
+            if fnmatch.fnmatch(path, wildcard):
+                files.append(os.path.relpath(path, "assets"))
+        return files
 
-    modeldef = dict(textures=textures, elements=elements)
-    model_cache[path] = modeldef
-    return modeldef
+    def open_file(self, path, mode="r"):
+        return self.zip.open("assets/" + path, mode="r")
 
-def resolve_texture(texturesdef, texture):
-    if not texture.startswith("#"):
-        return os.path.join(TEXTURE_BASE, texture + ".png")
-    name = texture[1:]
-    if not name in texturesdef:
-        return None
-    return resolve_texture(texturesdef, texturesdef[name])
+    def load_file(self, path):
+        f = self.open_file(path)
+        data = f.read()
+        f.close()
+        return data
 
-def resolve_element(texturesdef, elementdef):
-    faces = {}
-    for direction, facedef in elementdef["faces"].items():
-        faces[side] = resolve_texture(textures, face["texture"])
-    return faces
+class Assets:
+    def __init__(self, source):
+        self.source = None
+        if os.path.isdir(source):
+            self.source = DirectorySource(source)
+        elif os.path.isfile(source) and source.endswith(".jar"):
+            self.source = JarFileSource(source)
+        else:
+            raise RuntimeError("Unknown asset source! Must be asset directory or Minecraft jar file.")
 
-def is_complete(modeldef):
-    textures = set()
-    for elementdef in modeldef["elements"]:
-        for direction, facedef in elementdef["faces"].items():
-            textures.add(facedef["texture"])
-    return all([ resolve_texture(textures, t) is not None for t in textures ])
+        self.blockstate_base = "minecraft/blockstates"
+        self.model_base = "minecraft/models"
+        self.texture_base = "minecraft/textures"
 
-def load_blockdef(path):
-    m = json.load(open(path))
-    return m
+        self._model_json_cache = {}
+        self._model_cache = {}
+
+    def get_blockstate(self, path):
+        filename = os.path.basename(path)
+        assert filename.endswith(".json")
+        name = filename.replace(".json", "")
+        return Blockstate(self, name, json.loads(self.source.load_file(path)))
+
+    @property
+    def blockstate_files(self):
+        return self.source.glob_files(os.path.join(self.blockstate_base, "*.json"))
+
+    @property
+    def blockstates(self):
+        blockstates = []
+        for path in self.blockstate_files:
+            blockstates.append(self.get_blockstate(path))
+        return blockstates
+
+    def _get_model_json(self, path):
+        if path in self._model_json_cache:
+            return self._model_json_cache[path]
+
+        m = json.loads(self.source.load_file(path))
+
+        textures = {}
+        elements = {}
+
+        if "parent" in m:
+            parent = self._get_model_json(os.path.join(self.model_base, m["parent"] + ".json"))
+            textures.update(parent["textures"])
+            if "elements" in parent:
+                elements = parent["elements"]
+
+        textures.update(m.get("textures", {}))
+        if "elements" in m:
+            elements = m["elements"]
+
+        modeldef = dict(textures=textures, elements=elements)
+        self._model_json_cache[path] = modeldef
+        return modeldef
+
+    def get_model(self, path):
+        if path in self._model_cache:
+            return self._model_cache[path]
+
+        filename = os.path.basename(path)
+        assert filename.endswith(".json")
+        name = filename.replace(".json", "")
+        model = Model(self, name, self._get_model_json(path))
+        self._model_cache[path] = model
+        return model
+
+    @property
+    def model_files(self):
+        return self.source.glob_files(os.path.join(self.model_base, "block", "*.json"))
+
+    @property
+    def models(self):
+        models = []
+        for path in self.model_files:
+            models.append(self.get_model(path))
+        return models
+
+    def load_texture(self, path):
+        return self.source.open_file(os.path.join(self.texture_base, path), mode="rb")
+
+class Blockstate:
+    def __init__(self, assets, name, data):
+        self.assets = assets
+        self.name = name
+        self.data = data
+
+        self.properties = self._get_properties()
+        self.variants = self._get_variants(self.properties)
+    
+    def evaluate_variant(self, variant):
+        modelrefs = []
+        if "variants" in self.data:
+            for condition, model in self.data["variants"].items():
+                condition = parse_variant(condition)
+                if is_condition_fulfilled(condition, variant):
+                    modelrefs.append(model)
+        elif "multipart" in self.data:
+            for part in self.data["multipart"]:
+                if not "when" in part:
+                    modelrefs.append(part["apply"])
+                    continue
+
+                when = part["when"]
+                if len(when) == 1 and "OR" in when:
+                    if any(map(lambda c: is_condition_fulfilled(c, variant), when["OR"])):
+                        modelrefs.append(part["apply"])
+                else:
+                    if is_condition_fulfilled(when, variant):
+                        modelrefs.append(part["apply"])
+        else:
+            assert False, "There must be variants defined!"
+
+        evaluated = []
+        for modelref in modelrefs:
+            # TODO
+            if isinstance(modelref, list):
+                modelref = modelref[0]
+            model_name = modelref["model"]
+            model_transformation = dict(modelref)
+            del model_transformation["model"]
+            model = self.assets.get_model(os.path.join("minecraft/models", model_name + ".json"))
+            evaluated.append((model, model_transformation))
+        return evaluated
+
+    def _get_properties(self):
+        variables = {}
+
+        def apply_condition(condition):
+            nonlocal variables
+            for key, value in condition.items():
+                if key not in variables:
+                    variables[key] = set()
+                
+                if type(value) == bool:
+                    value = "true" if value else "false"
+
+                values = set([value])
+                if "|" in value:
+                    values = set(value.split("|"))
+                # TODO this is a bit hacky
+                # (just assume there must be true to false value, and vice versa)
+                if "true" in values:
+                    values.add("false")
+                if "false" in values:
+                    values.add("true")
+                variables[key].update(values)
+
+        if "variants" in self.data:
+            for condition, variant in self.data["variants"].items():
+                apply_condition(parse_variant(condition))
+        elif "multipart" in self.data:
+            for part in self.data["multipart"]:
+                if not "when" in part:
+                    continue
+                when = part["when"]
+                if len(when) == 1 and "OR" in when:
+                    conditions = when["OR"]
+                    for condition in conditions:
+                        apply_condition(condition)
+                else:
+                    apply_condition(when)
+        else:
+            assert False, "There must be variants defined!"
+        return variables
+
+    def _get_variants(self, properties):
+        # from a dictionary like {'variable1' : {'value1', 'value2'}}
+        # returns all possible variants
+        if len(properties) == 0:
+            return [{}]
+
+        keys = list(properties.keys())
+        values = list(properties.values())
+
+        variants = []
+        for product in itertools.product(*values):
+            variants.append(dict(list(zip(keys, product))))
+        return variants
+
+    def __repr__(self):
+        return "<Blockstate name=%s>" % self.name
+
+class Model:
+    def __init__(self, assets, name, data):
+        self.assets = assets
+        self.name = name
+        self.data = data
+
+    @property
+    def textures(self):
+        return self.data["textures"]
+
+    @property
+    def elements(self):
+        return self.data["elements"]
+
+    def load_texture(self, texture):
+        if not texture.startswith("#"):
+            return self.assets.load_texture(texture + ".png")
+            #return os.path.join(TEXTURE_BASE, texture + ".png")
+        name = texture[1:]
+        if not name in self.textures:
+            return None
+        return self.load_texture(self.textures[name])
+
+    def __repr__(self):
+        return "<Model name=%s>" % self.name
+
+#BASE = os.path.join(os.path.abspath(os.path.dirname(__file__)), "assets/minecraft")
+#MODEL_BASE = os.path.join(BASE, "models")
+#TEXTURE_BASE = os.path.join(BASE, "textures")
+
+#def resolve_texture(texturesdef, texture):
+#    if not texture.startswith("#"):
+#        return os.path.join(TEXTURE_BASE, texture + ".png")
+#    name = texture[1:]
+#    if not name in texturesdef:
+#        return None
+#    return resolve_texture(texturesdef, texturesdef[name])
 
 def parse_variant(condition):
     if condition == "":
@@ -98,108 +306,19 @@ def is_condition_fulfilled(condition, variant):
             return False
     return True
 
-def get_blockdef_variables(blockdef):
-    variables = {}
-
-    def apply_condition(condition):
-        nonlocal variables
-        for key, value in condition.items():
-            if key not in variables:
-                variables[key] = set()
-            
-            if type(value) == bool:
-                value = "true" if value else "false"
-
-            values = set([value])
-            if "|" in value:
-                values = set(value.split("|"))
-            # TODO this is a bit hacky
-            # (just assume there must be true to false value, and vice versa)
-            if "true" in values:
-                values.add("false")
-            if "false" in values:
-                values.add("true")
-            variables[key].update(values)
-
-    if "variants" in blockdef:
-        for condition, variant in blockdef["variants"].items():
-            apply_condition(parse_variant(condition))
-    elif "multipart" in blockdef:
-        for part in blockdef["multipart"]:
-            if not "when" in part:
-                continue
-            when = part["when"]
-            if len(when) == 1 and "OR" in when:
-                conditions = when["OR"]
-                for condition in conditions:
-                    apply_condition(condition)
-            else:
-                apply_condition(when)
-    else:
-        assert False, "There must be variants defined!"
-    return variables
-
-def get_variable_variants(variables):
-    # from a dictionary like {'variable1' : {'value1', 'value2'}}
-    # returns all possible variants
-    if len(variables) == 0:
-        return [{}]
-    
-    keys = list(variables.keys())
-    values = list(variables.values())
-
-    variants = []
-    for product in itertools.product(*values):
-        variants.append(dict(list(zip(keys, product))))
-    return variants
-
-def get_blockdef_variants(blockdef):
-    return get_variable_variants(get_blockdef_variables(blockdef))
-
-def get_blockdef_modelrefs(blockdef, variant):
-    models = []
-    if "variants" in blockdef:
-        for condition, model in blockdef["variants"].items():
-            condition = parse_variant(condition)
-            if is_condition_fulfilled(condition, variant):
-                models.append(model)
-    elif "multipart" in blockdef:
-        for part in blockdef["multipart"]:
-            if not "when" in part:
-                models.append(part["apply"])
-                continue
-
-            when = part["when"]
-            if len(when) == 1 and "OR" in when:
-                if any(map(lambda c: is_condition_fulfilled(c, variant), when["OR"])):
-                    models.append(part["apply"])
-            else:
-                if is_condition_fulfilled(when, variant):
-                    models.append(part["apply"])
-    else:
-        assert False, "There must be variants defined!"
-    return models
-
 if __name__ == "__main__":
-    #for path in sys.argv[1:]:
-    #    m = load_modeldef(path)
-    #    print(path, is_complete(m))
-    #    print(m["elements"])
-    #    print(resolve_element(m["elements"][0], m["textures"]))
+    assets = Assets(sys.argv[1])
 
     total_variants = 0
-    for path in sys.argv[1:]:
-        blockdef = load_blockdef(path)
-        variables = get_blockdef_variables(blockdef)
-        variants = get_blockdef_variants(blockdef)
-        total_variants += len(variants)
-        print(path)
-        print("Variant variables:", variables)
-        print("#variants:", len(variants))
-        for variant in variants:
+    for blockstate in assets.blockstates:
+        total_variants += len(blockstate.variants)
+        print(blockstate.name)
+        print("Variant properties:", blockstate.properties)
+        print("#variants:", len(blockstate.variants))
+        for variant in blockstate.variants:
             print(variant)
-            for modelrefs in get_blockdef_modelrefs(blockdef, variant):
-                print("=> ", modelrefs)
+            for model, transformation in blockstate.evaluate_variant(variant):
+                print("=> ", model, transformation)
         print("")
     print("Total variants:", total_variants)
     print("Size: %.2f MB" % (total_variants*32*32*4 / (1024*1024)))

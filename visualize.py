@@ -3,14 +3,17 @@
 import sys
 import numpy as np
 import math
+import random
 from vispy import app, gloo
 
 import mcmodel
 import render
 
-blockdef = mcmodel.load_blockdef(sys.argv[1])
-glblock = render.Block(blockdef)
-variants = sorted(mcmodel.get_blockdef_variants(blockdef), key=mcmodel.encode_variant)
+assets = mcmodel.Assets("assets")
+blockstate = random.choice(assets.blockstates)
+
+glblock = render.Block(blockstate)
+variants = blockstate.variants
 print("Block has variants:")
 for variant in variants:
     print("-", variant)

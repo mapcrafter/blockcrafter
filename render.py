@@ -3,7 +3,7 @@ import numpy as np
 import math
 import time
 from PIL import Image
-from vispy import app, gloo, io, geometry
+from vispy import app, gloo, geometry
 from vispy.util import transforms
 
 import mcmodel
@@ -204,16 +204,14 @@ class Element:
         [0, 1, 0],
     ]
 
-    def __init__(self, elementdef, texturesdef):
+    def __init__(self, model, element):
         super().__init__()
 
-        self.elementdef = elementdef
+        self.faces = Element.load_faces(model, element)
+        self.rotation = element.get("rotation", None)
 
-        self.faces = Element.load_faces(elementdef, texturesdef)
-        self.rotation = elementdef.get("rotation", None)
-
-        self.xyz0 = (np.array(elementdef["from"]) - 8.0) / 16.0 * 2.0
-        self.xyz1 = (np.array(elementdef["to"]) - 8.0) / 16.0 * 2.0
+        self.xyz0 = (np.array(element["from"]) - 8.0) / 16.0 * 2.0
+        self.xyz1 = (np.array(element["to"]) - 8.0) / 16.0 * 2.0
 
         self.scale = (self.xyz1 - self.xyz0) * 0.5
         self.translate = (self.xyz1 + self.xyz0) * 0.5
@@ -318,8 +316,8 @@ class Element:
 
     def render(self, model, view, projection, mode="color", element_transform=np.eye(4, dtype=np.float32), uvlock=False):
         rotation = np.eye(4, dtype=np.float32)
-        if "rotation" in self.elementdef:
-            rotationdef = self.elementdef["rotation"]
+        if self.rotation:
+            rotationdef = self.rotation
             axis = {"x" : [1, 0, 0],
                     "y" : [0, 1, 0],
                     "z" : [0, 0, 1]}[rotationdef["axis"]]
@@ -346,7 +344,7 @@ class Element:
             self.render_face(i, texture, uvs, complete_model, view, projection, element_transform=element_transform, uvlock=uvlock or mode == "uv")
 
     @staticmethod
-    def load_faces(elementdef, texturesdef):
+    def load_faces(model, element):
         # order of minecraft directions to order of cube sides
         mc_to_opengl = [
             "east",   # pos x
@@ -358,13 +356,14 @@ class Element:
         ]
 
         faces = {}
-        for direction, facedef in elementdef["faces"].items():
-            path = mcmodel.resolve_texture(texturesdef, facedef["texture"])
-            if path is None:
+        for direction, facedef in element["faces"].items():
+            f = model.load_texture(facedef["texture"])
+            if f is None:
                 raise RuntimeError("Face in direction '%s' has no texture associated" % direction)
             uvs = np.array(facedef.get("uv", [0, 0, 16, 16]), dtype=np.float32) / 16.0
             uv0, uv1 = uvs[:2], uvs[2:]
-            faces[direction] = (gloo.Texture2D(data=io.imread(path)), (uv0, uv1))
+            faces[direction] = (gloo.Texture2D(data=np.array(Image.open(f))), (uv0, uv1))
+            f.close()
 
         # gather faces in order for cube sides
         # remember: each side is (texture, (uv0, uv1))
@@ -378,8 +377,8 @@ class Element:
 class Model:
     def __init__(self, modeldef):
         self.elements = []
-        for elementdef in modeldef["elements"]:
-            self.elements.append(Element(elementdef, modeldef["textures"]))
+        for elementdef in modeldef.elements:
+            self.elements.append(Element(modeldef, elementdef))
 
     def render(self, model, view, projection, mode="color", modelref={}, rotation=0):
         m = np.eye(4, dtype=np.float32)
@@ -394,25 +393,17 @@ class Model:
             element.render(model, view, projection, mode=mode, element_transform=m, uvlock=uvlock)
 
 class Block:
-    def __init__(self, blockdef):
-        self.blockdef = blockdef
+    def __init__(self, blockstate):
+        self.blockstate = blockstate
         self.models = {}
         self.variants = {}
 
-    def _load_modeldef(self, name):
-        modeldef = mcmodel.load_modeldef(os.path.join(mcmodel.MODEL_BASE, name + ".json"))
-        model = Model(modeldef)
-        return model
-
     def _load_variant(self, variant):
         modelrefs = []
-        for modelref in mcmodel.get_blockdef_modelrefs(self.blockdef, variant):
-            # TODO
-            if type(modelref) == list:
-                modelref = modelref[0]
-            if not modelref["model"] in self.models:
-                self.models[modelref["model"]] = self._load_modeldef(modelref["model"])
-            modelrefs.append(modelref)
+        for model, transformation in self.blockstate.evaluate_variant(variant):
+            if not model.name in self.models:
+                self.models[model.name] = Model(model)
+            modelrefs.append((self.models[model.name], transformation))
         return modelrefs
 
     def render(self, variant, model, view, projection, mode="color", rotation=0):
@@ -421,9 +412,8 @@ class Block:
             self.variants[variant_str] = self._load_variant(variant)
 
         modelrefs = self.variants[variant_str]
-        for modelref in modelrefs:
-            glmodel = self.models[modelref["model"]]
-            glmodel.render(model, view, projection, mode=mode, modelref=modelref, rotation=rotation)
+        for glmodel, transformation  in modelrefs:
+            glmodel.render(model, view, projection, mode=mode, modelref=transformation, rotation=rotation)
 
 def create_transform_ortho(aspect=1.0, fake_ortho=True):
     model = np.eye(4, dtype=np.float32)
