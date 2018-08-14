@@ -5,12 +5,14 @@ import numpy as np
 import math
 import random
 from vispy import app, gloo
+from vispy.util import transforms
 
 import mcmodel
 import render
 
 assets = mcmodel.Assets("assets")
-blockstate = random.choice(assets.blockstates)
+#blockstate = random.choice(assets.blockstates)
+blockstate = assets.get_blockstate("minecraft/blockstates/comparator.json")
 
 glblock = render.Block(blockstate)
 variants = blockstate.variants
@@ -106,7 +108,7 @@ class Canvas(app.Canvas):
         rotation = self.rotation_index
         if self.run_phi:
             self.phi += 0.2
-        actual_model = np.dot(render.create_model_transform(0, self.phi), self.model)
+        actual_model = np.dot(transforms.rotate(self.phi, (0, 1, 0)), self.model)
 
         current_variant = variants[self.variant_index]
         current_mode = modes[self.mode_index]

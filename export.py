@@ -4,18 +4,13 @@ import os
 import sys
 import numpy as np
 import math
+import argparse
+import itertools
 from PIL import Image
 from vispy import app, gloo, io, geometry
 
 import mcmodel
 import render
-
-assetdir = "assets"
-#assetdir = "/home/moritz/.minecraft/versions/1.13/1.13.jar"
-w, h = 32, 32
-columns = 32
-rotation = 0
-outdir = "out"
 
 class BlockImages:
     def __init__(self):
@@ -26,66 +21,72 @@ class BlockImages:
         return len(self.blocks) - 1
 
     def export(self, columns=32):
-        rows = (len(self.blocks) + columns) // 16
+        w, h = self.blocks[0].size
+        rows = (len(self.blocks) + columns) // columns
         image = Image.new("RGBA", (columns * w, rows * h))
         for i, block in enumerate(self.blocks):
+            assert block.size == (w, h)
             x = i % columns
             y = (i - x) // columns
             image.paste(block, (x * h, y * h))
         return image
 
 class Canvas(app.Canvas):
-    def __init__(self):
+    def __init__(self, args):
         super().__init__()
 
+        self.draw_attempt = False
         self.show()
         self.update()
 
-        self.draw_attempt = False
+        self.args = args
+        self.texture_sizes = args.texture_size
+        if self.texture_sizes is None:
+            self.texture_sizes = [16]
+        self.views = args.view
+        if self.views is None:
+            self.views = ["isometric"]
+        self.rotations = args.rotation
+        if self.rotations is None:
+            self.rotations = [0, 1, 2, 3]
 
-    def on_draw(self, event):
-        if self.draw_attempt:
-            self.close()
-        self.draw_attempt = True
+        self.assets = mcmodel.Assets(args.assets)
 
-        model, view, projection = render.create_transform_ortho(aspect=1.0, fake_ortho=True)
+    def render_blocks(self, blockstates, texture_size, render_view, rotation, info_path, image_path):
+        block_size = None
+        if render_view == "isometric":
+            block_size = texture_size * 2
+        elif render_view == "topdown":
+            block_size = texture_size
+        else:
+            assert False, "Invalid view '%s'" % view
 
-        texture = gloo.Texture2D(shape=(w, h, 4))
-        depth = gloo.RenderBuffer(shape=(w, h))
+        model, view, projection = render.create_transform_ortho(aspect=1.0, view=render_view, fake_ortho=True)
+
+        texture = gloo.Texture2D(shape=(block_size, block_size, 4))
+        depth = gloo.RenderBuffer(shape=(block_size, block_size))
         fbo = gloo.FrameBuffer(color=texture, depth=depth)
         fbo.activate()
 
-        gloo.set_viewport(0, 0, w, h)
+        gloo.set_viewport(0, 0, block_size, block_size)
         gloo.set_clear_color((0.0, 0.0, 0.0, 0.0))
         gloo.set_state(depth_test=True, blend=True)
-
-        assets = mcmodel.Assets(assetdir)
-        blockstates = assets.blockstates
         total_variants = sum([ len(b.variants) for b in blockstates ])
-        print("Got %d blockstates, %d variants in total" % (len(blockstates), total_variants))
 
-        os.makedirs(outdir, exist_ok=True)
-        finfo = open(os.path.join(outdir, "blocks.txt"), "w")
+        os.makedirs(self.args.output_dir, exist_ok=True)
+        finfo = open(info_path, "w")
         print("%d %d" % (total_variants, columns), file=finfo)
 
         images = BlockImages()
-        solid_uv_index = None
-
         for blockstate in blockstates:
-            print("Taking block %s" % blockstate.name)
-
             glblock = render.Block(blockstate)
             for index, variant in enumerate(blockstate.variants):
-                print("Rendering variant %d/%d" % (index+1, len(blockstate.variants)))
-
                 modes = ["color", "uv"]
                 indices = []
                 for mode in modes:
                     gloo.clear(color=True, depth=True)
 
-                    actual_model = np.dot(render.create_model_transform(rotation=rotation), model)
-
-                    glblock.render(variant, actual_model, view, projection, mode=mode)
+                    glblock.render(variant, actual_model, view, projection, mode=mode, rotation=rotation)
 
                     image = Image.fromarray(fbo.read("color"))
                     index = images.append(image)
@@ -94,21 +95,42 @@ class Canvas(app.Canvas):
                 variant_name = mcmodel.encode_variant(variant)
                 if variant_name == "":
                     variant_name = "-"
-                block_filename = "%s_%d" % (blockstate.name, index)
-
                 print("%s %s color=%d,uv=%d" % (blockstate.name, variant_name, indices[0], indices[1]), file=finfo)
-
-        images.export(columns).save(os.path.join(outdir, "blocks.png"))
+        images.export(columns=32).save(image_path)
 
         finfo.close()
         fbo.deactivate()
-        self.close()
+
+    def on_draw(self, event):
+        if self.draw_attempt:
+            self.close()
+            return
+        self.draw_attempt = True
+
+        path_template = "{view}_{rotation}_{texture_size}"
+        blockstates = self.assets.blockstates
+        for texture_size, view, rotation in itertools.product(self.texture_sizes, self.views, self.rotations):
+            name = path_template.format(texture_size=texture_size, view=view, rotation=rotation)
+
+            info_path = os.path.join(self.args.output_dir, name + ".txt")
+            image_path = os.path.join(self.args.output_dir, name + ".png")
+            print(image_path)
+            self.render_blocks(blockstates, texture_size, view, rotation, info_path, image_path)
 
 if __name__ == "__main__":
-    import vispy
-    if "--osmesa" in sys.argv[1:]:
+    parser = argparse.ArgumentParser(description="Generate block images for Mapcrafter.")
+    parser.add_argument("--osmesa", action="store_true")
+    parser.add_argument("--texture-size", "-t", type=int, action="append")
+    parser.add_argument("--view", "-v", type=str, action="append")
+    parser.add_argument("--rotation", "-r", type=int, action="append")
+    parser.add_argument("--assets", "-a", type=str, required=True)
+    parser.add_argument("--output-dir", "-o", type=str, required=True)
+
+    args = parser.parse_args()
+    if args.osmesa:
+        import vispy
         vispy.use("osmesa")
         assert vispy.app.use_app().backend_name == "osmesa"
 
-    c = Canvas()
+    c = Canvas(args)
     app.run()

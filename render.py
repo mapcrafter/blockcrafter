@@ -174,7 +174,7 @@ class Element:
         [1, 0, 4, 5],
         [3, 2, 6, 7],
         [1, 2, 3, 0],
-        [5, 4, 7, 6],
+        [6, 5, 4, 7],
         [0, 3, 7, 4],
         [2, 1, 5, 6],
     ]
@@ -198,8 +198,8 @@ class Element:
     CUBE_TEXTURE_DIRS = [
         [0, 1, 0],
         [0, 1, 0],
-        [1, 0, 0],
-        [1, 0, 0],
+        [0, 0, -1],
+        [0, 0, -1],
         [0, 1, 0],
         [0, 1, 0],
     ]
@@ -394,7 +394,7 @@ class Model:
             m = np.dot(m, transforms.rotate(modelref["x"], (1, 0, 0)))
         if "y" in modelref:
             m = np.dot(m, transforms.rotate(modelref["y"], (0, 1, 0)))
-        m = np.dot(m, transforms.rotate(rotation * 90, (0, 1, 0)))
+        m = np.dot(m, transforms.rotate(-rotation * 90, (0, 1, 0)))
 
         uvlock = modelref.get("uvlock", False)
         for element in self.elements:
@@ -423,17 +423,26 @@ class Block:
         for glmodel, transformation  in modelrefs:
             glmodel.render(model, view, projection, mode=mode, modelref=transformation, rotation=rotation)
 
-def create_transform_ortho(aspect=1.0, fake_ortho=True):
+def create_transform_ortho(aspect=1.0, view="isometric", fake_ortho=True):
     model = np.eye(4, dtype=np.float32)
-    if fake_ortho:
-        # 0.816479 = 0.5 * sqrt(3) * x = 0.5 * sqrt(2)
-        # scale of y-axis to make sides and top of same height: (1.0, 0.81649, 1.0)
-        # scale to get block completely into viewport (-1;1): (1.0 / math.sqrt(2), ..., ...)
-        model = np.dot(model, transforms.scale((1.0 / math.sqrt(2), 0.816479 / math.sqrt(2), 1.0 / math.sqrt(2))))
-    else:
-        model = np.dot(model, transforms.scale((0.5, 0.5, 0.5)))
 
-    model = np.dot(model, np.dot(transforms.rotate(45, (0, 1, 0)), transforms.rotate(30, (1, 0, 0))))
+    if view == "isometric":
+        if fake_ortho:
+            # 0.816479 = 0.5 * sqrt(3) * x = 0.5 * sqrt(2)
+            # scale of y-axis to make sides and top of same height: (1.0, 0.81649, 1.0)
+            # scale to get block completely into viewport (-1;1): (1.0 / math.sqrt(2), ..., ...)
+            model = np.dot(model, transforms.scale((1.0 / math.sqrt(2), 0.816479 / math.sqrt(2), 1.0 / math.sqrt(2))))
+        else:
+            # this scale factor is just for nicely viewing the block image manually
+            model = np.dot(model, transforms.scale((0.5, 0.5, 0.5)))
+
+        # and do that nice tilt
+        model = np.dot(model, np.dot(transforms.rotate(45, (0, 1, 0)), transforms.rotate(30, (1, 0, 0))))
+    elif view == "topdown":
+        model = np.dot(model, transforms.rotate(90, (1, 0, 0)))
+    else:
+        assert False, "Invalid view '%s'!" % view
+
     view = transforms.translate((0, 0, -5))
     projection = transforms.ortho(-aspect, aspect, -1, 1, 2.0, 50.0)
     return model, view, projection
@@ -443,7 +452,4 @@ def create_transform_perspective(aspect=1.0):
     view = transforms.translate((0, 0, -5))
     projection = transforms.perspective(45.0, aspect, 2.0, 50.0)
     return model, view, projection
-
-def create_model_transform(rotation=0, phi=0.0):
-    return transforms.rotate(rotation * 90 + phi, (0, 1, 0))
 

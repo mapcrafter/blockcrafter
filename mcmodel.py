@@ -229,7 +229,7 @@ class Blockstate:
         values = list(properties.values())
 
         variants = []
-        for product in itertools.product(*values):
+        for product in sorted(itertools.product(*values)):
             variants.append(dict(list(zip(keys, product))))
         return variants
 
