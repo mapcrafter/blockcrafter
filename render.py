@@ -204,6 +204,25 @@ class Element:
         [0, 1, 0],
     ]
 
+    _color_program = None 
+    _uv_program = None
+
+    @classmethod
+    def get_program(cls, mode):
+        if mode == "color":
+            if cls._color_program is None:
+                cls._color_program = gloo.Program(VERTEX, FRAGMENT_BLOCK_COLOR)
+                cls._color_program["a_position"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
+                cls._color_program["a_normal"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
+            return cls._color_program
+        if mode == "uv":
+            if cls._uv_program is None:
+                cls._uv_program = gloo.Program(VERTEX, FRAGMENT_BLOCK_UV)
+                cls._uv_program["a_position"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
+                cls._uv_program["a_normal"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
+            return cls._uv_program
+        assert False, "Invalid mode!"
+
     def __init__(self, model, element):
         super().__init__()
 
@@ -217,14 +236,6 @@ class Element:
         self.translate = (self.xyz1 + self.xyz0) * 0.5
         self.points = np.array(Element.CUBE_POINTS) * self.scale + self.translate
         self.indices = gloo.IndexBuffer(np.array([0, 1, 2, 0, 2, 3], dtype=np.uint32))
-
-        self.color_program = gloo.Program(VERTEX, FRAGMENT_BLOCK_COLOR)
-        self.uv_program = gloo.Program(VERTEX, FRAGMENT_BLOCK_UV)
-        self.current_program = None
-
-        for program in (self.color_program, self.uv_program):
-            program["a_position"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
-            program["a_normal"] = gloo.VertexBuffer(np.zeros((4, 3), dtype=np.float32))
 
     def render_face(self, face_index, texture, uvs, model, view, projection, element_transform, uvlock):
         program = self.current_program
@@ -324,11 +335,8 @@ class Element:
             origin = (np.array(rotationdef.get("origin", [8, 8, 8]), dtype=np.float32) - 8.0) / 16.0 * 2.0
             rotation = np.dot(transforms.translate(-origin), np.dot(transforms.rotate(rotationdef["angle"], axis), transforms.translate(origin)))
 
-        self.current_program = {
-            "color" : self.color_program,
-            "uv" : self.uv_program,
-        }[mode]
-        program = self.current_program
+        program = Element.get_program(mode)
+        self.current_program = program
 
         # add rotation of element to element transformation
         element_transform = np.dot(rotation, element_transform)
