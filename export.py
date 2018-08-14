@@ -120,6 +120,8 @@ class Canvas(app.Canvas):
             print(image_path)
             self.render_blocks(blockstates, texture_size, view, rotation, info_path, image_path)
 
+        self.close()
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate block images for Mapcrafter.")
     parser.add_argument("--osmesa", action="store_true")
