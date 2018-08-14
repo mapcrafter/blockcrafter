@@ -12,7 +12,7 @@ import render
 
 assets = mcmodel.Assets("assets")
 #blockstate = random.choice(assets.blockstates)
-blockstate = assets.get_blockstate("minecraft/blockstates/comparator.json")
+blockstate = assets.get_blockstate("minecraft/blockstates/test_orientation.json")
 
 glblock = render.Block(blockstate)
 variants = blockstate.variants
@@ -108,11 +108,11 @@ class Canvas(app.Canvas):
         rotation = self.rotation_index
         if self.run_phi:
             self.phi += 0.2
-        actual_model = np.dot(transforms.rotate(self.phi, (0, 1, 0)), self.model)
+        actual_model = render.apply_model_rotation(self.model, rotation=rotation, phi=self.phi)
 
         current_variant = variants[self.variant_index]
         current_mode = modes[self.mode_index]
-        glblock.render(current_variant, actual_model, self.view, self.projection, mode=current_mode, rotation=rotation)
+        glblock.render(current_variant, actual_model, self.view, self.projection, mode=current_mode)
 
         v = lambda *a: np.array(a, dtype=np.float32)
         render.draw_line(v(0, 0, 0), v(10, 0, 0), actual_model, self.view, self.projection, color=(1, 0, 0, 1))

@@ -388,13 +388,12 @@ class Model:
         for elementdef in modeldef.elements:
             self.elements.append(Element(modeldef, elementdef))
 
-    def render(self, model, view, projection, mode="color", modelref={}, rotation=0):
+    def render(self, model, view, projection, mode="color", modelref={}):
         m = np.eye(4, dtype=np.float32)
         if "x" in modelref:
             m = np.dot(m, transforms.rotate(modelref["x"], (1, 0, 0)))
         if "y" in modelref:
             m = np.dot(m, transforms.rotate(modelref["y"], (0, 1, 0)))
-        m = np.dot(m, transforms.rotate(-rotation * 90, (0, 1, 0)))
 
         uvlock = modelref.get("uvlock", False)
         for element in self.elements:
@@ -414,14 +413,14 @@ class Block:
             modelrefs.append((self.models[model.name], transformation))
         return modelrefs
 
-    def render(self, variant, model, view, projection, mode="color", rotation=0):
+    def render(self, variant, model, view, projection, mode="color"):
         variant_str = mcmodel.encode_variant(variant)
         if variant_str not in self.variants:
             self.variants[variant_str] = self._load_variant(variant)
 
         modelrefs = self.variants[variant_str]
         for glmodel, transformation  in modelrefs:
-            glmodel.render(model, view, projection, mode=mode, modelref=transformation, rotation=rotation)
+            glmodel.render(model, view, projection, mode=mode, modelref=transformation)
 
 def create_transform_ortho(aspect=1.0, view="isometric", fake_ortho=True):
     model = np.eye(4, dtype=np.float32)
@@ -453,3 +452,6 @@ def create_transform_perspective(aspect=1.0):
     projection = transforms.perspective(45.0, aspect, 2.0, 50.0)
     return model, view, projection
 
+def apply_model_rotation(model, rotation=0, phi=0.0):
+    rotation = transforms.rotate(-rotation * 90 + phi, (0, 1, 0))
+    return np.dot(rotation, model)

@@ -88,7 +88,8 @@ class Canvas(app.Canvas):
                 for mode in modes:
                     gloo.clear(color=True, depth=True)
 
-                    glblock.render(variant, model, view, projection, mode=mode, rotation=rotation)
+                    actual_model = render.apply_model_rotation(model, rotation=rotation)
+                    glblock.render(variant, model, view, projection, mode=mode)
 
                     image = Image.fromarray(fbo.read("color"))
                     index = images.append(image)
