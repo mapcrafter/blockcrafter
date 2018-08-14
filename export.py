@@ -13,8 +13,26 @@ import render
 assetdir = "assets"
 #assetdir = "/home/moritz/.minecraft/versions/1.13/1.13.jar"
 w, h = 32, 32
+columns = 32
 rotation = 0
 outdir = "out"
+
+class BlockImages:
+    def __init__(self):
+        self.blocks = []
+
+    def append(self, image):
+        self.blocks.append(image)
+        return len(self.blocks) - 1
+
+    def export(self, columns=32):
+        rows = (len(self.blocks) + columns) // 16
+        image = Image.new("RGBA", (columns * w, rows * h))
+        for i, block in enumerate(self.blocks):
+            x = i % columns
+            y = (i - x) // columns
+            image.paste(block, (x * h, y * h))
+        return image
 
 class Canvas(app.Canvas):
     def __init__(self):
@@ -41,21 +59,28 @@ class Canvas(app.Canvas):
         gloo.set_clear_color((0.0, 0.0, 0.0, 0.0))
         gloo.set_state(depth_test=True, blend=True)
 
-        finfo = open(os.path.join(outdir, "blocks.txt"), "w")
-
         assets = mcmodel.Assets(assetdir)
-        for blockstate in assets.blockstates:
+        blockstates = assets.blockstates
+        total_variants = sum([ len(b.variants) for b in blockstates ])
+        print("Got %d blockstates, %d variants in total" % (len(blockstates), total_variants))
+
+        os.makedirs(outdir, exist_ok=True)
+        finfo = open(os.path.join(outdir, "blocks.txt"), "w")
+        print("%d %d" % (total_variants, columns), file=finfo)
+
+        images = BlockImages()
+        solid_uv_index = None
+
+        for blockstate in blockstates:
             print("Taking block %s" % blockstate.name)
 
             glblock = render.Block(blockstate)
             for index, variant in enumerate(blockstate.variants):
                 print("Rendering variant %d/%d" % (index+1, len(blockstate.variants)))
 
-                variant_name = mcmodel.encode_variant(variant)
-                if variant_name == "":
-                    variant_name = "-"
-                block_filename = "%s_%d" % (blockstate.name, index)
-                for mode in ("color", "uv"):
+                modes = ["color", "uv"]
+                indices = []
+                for mode in modes:
                     gloo.clear(color=True, depth=True)
 
                     actual_model = np.dot(render.create_model_transform(rotation=rotation), model)
@@ -63,8 +88,17 @@ class Canvas(app.Canvas):
                     glblock.render(variant, actual_model, view, projection, mode=mode)
 
                     image = Image.fromarray(fbo.read("color"))
-                    image.save(os.path.join(outdir, "%s_%s.png" % (block_filename, mode)))
-                print("%s %s %s %s" % (blockstate.name, variant_name, block_filename + "_color.png", block_filename + "_uv.png"), file=finfo)
+                    index = images.append(image)
+                    indices.append(index)
+
+                variant_name = mcmodel.encode_variant(variant)
+                if variant_name == "":
+                    variant_name = "-"
+                block_filename = "%s_%d" % (blockstate.name, index)
+
+                print("%s %s color=%d,uv=%d" % (blockstate.name, variant_name, indices[0], indices[1]), file=finfo)
+
+        images.export(columns).save(os.path.join(outdir, "blocks.png"))
 
         finfo.close()
         fbo.deactivate()
