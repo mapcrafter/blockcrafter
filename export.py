@@ -12,6 +12,8 @@ from vispy import app, gloo, io, geometry
 import mcmodel
 import render
 
+COLUMNS = 32
+
 class BlockImages:
     def __init__(self):
         self.blocks = []
@@ -20,7 +22,7 @@ class BlockImages:
         self.blocks.append(image)
         return len(self.blocks) - 1
 
-    def export(self, columns=32):
+    def export(self, columns):
         w, h = self.blocks[0].size
         rows = (len(self.blocks) + columns) // columns
         image = Image.new("RGBA", (columns * w, rows * h))
@@ -75,7 +77,7 @@ class Canvas(app.Canvas):
 
         os.makedirs(self.args.output_dir, exist_ok=True)
         finfo = open(info_path, "w")
-        print("%d %d" % (total_variants, columns), file=finfo)
+        print("%d %d" % (total_variants, COLUMNS), file=finfo)
 
         images = BlockImages()
         for blockstate in blockstates:
@@ -86,7 +88,7 @@ class Canvas(app.Canvas):
                 for mode in modes:
                     gloo.clear(color=True, depth=True)
 
-                    glblock.render(variant, actual_model, view, projection, mode=mode, rotation=rotation)
+                    glblock.render(variant, model, view, projection, mode=mode, rotation=rotation)
 
                     image = Image.fromarray(fbo.read("color"))
                     index = images.append(image)
@@ -96,7 +98,7 @@ class Canvas(app.Canvas):
                 if variant_name == "":
                     variant_name = "-"
                 print("%s %s color=%d,uv=%d" % (blockstate.name, variant_name, indices[0], indices[1]), file=finfo)
-        images.export(columns=32).save(image_path)
+        images.export(columns=COLUMNS).save(image_path)
 
         finfo.close()
         fbo.deactivate()
