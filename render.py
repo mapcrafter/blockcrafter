@@ -370,7 +370,10 @@ class Element:
                 raise RuntimeError("Face in direction '%s' has no texture associated" % direction)
             uvs = np.array(facedef.get("uv", [0, 0, 16, 16]), dtype=np.float32) / 16.0
             uv0, uv1 = uvs[:2], uvs[2:]
-            faces[direction] = (gloo.Texture2D(data=np.array(Image.open(f))), (uv0, uv1))
+            image = Image.open(f)
+            if "rotation" in facedef:
+                image = image.rotate(-facedef["rotation"])
+            faces[direction] = (gloo.Texture2D(data=np.array(image)), (uv0, uv1))
             f.close()
 
         # gather faces in order for cube sides
