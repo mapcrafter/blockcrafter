@@ -12,7 +12,7 @@ import render
 
 assets = mcmodel.Assets("assets")
 #blockstate = random.choice(assets.blockstates)
-blockstate = assets.get_blockstate("minecraft/blockstates/test_orientation.json")
+blockstate = assets.get_blockstate("minecraft/blockstates/piston.json")
 
 glblock = render.Block(blockstate)
 variants = blockstate.variants

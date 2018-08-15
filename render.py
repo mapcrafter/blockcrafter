@@ -52,10 +52,15 @@ varying vec3 v_normal;
 
 void main() {
     vec4 t_color = texture2D(u_texture, v_texcoord);
-    vec4 t_color0 = texture2D(u_texture, v_texcoord0);
+
+    //vec4 t_color0 = texture2D(u_texture, v_texcoord0);
     if (t_color.a <= 0.00001) {
         discard;
     }
+
+    gl_FragColor = t_color;
+
+    /*
     // debugging for uvlock-rotated textures
     //t_color.rgb = mix(t_color.rgb, t_color0.rgb, 0.2);
 
@@ -77,6 +82,7 @@ void main() {
     // how much is light applied
     float alpha = 1.0;
     gl_FragColor = vec4(t_color.rgb * (alpha * intensity + (1.0 - alpha)), t_color.a);
+    */
 }
 """
 
@@ -344,7 +350,7 @@ class Element:
         program["u_model"] = complete_model
         program["u_view"] = view
         program["u_projection"] = projection
-        program["u_normal"] = np.array(np.matrix(np.dot(view, complete_model)).I.T)
+        #program["u_normal"] = np.array(np.matrix(np.dot(view, complete_model)).I.T)
 
         for i, (texture, uvs) in enumerate(self.faces):
             if texture is None:
