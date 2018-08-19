@@ -98,7 +98,7 @@ class Canvas(app.Canvas):
                 variant_name = mcmodel.encode_variant(variant)
                 if variant_name == "":
                     variant_name = "-"
-                print("%s %s color=%d,uv=%d" % (blockstate.name, variant_name, indices[0], indices[1]), file=finfo)
+                print("%s:%s %s color=%d,uv=%d" % (blockstate.prefix, blockstate.name, variant_name, indices[0], indices[1]), file=finfo)
         images.export(columns=COLUMNS).save(image_path)
 
         finfo.close()

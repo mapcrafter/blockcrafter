@@ -62,9 +62,9 @@ class Assets:
         else:
             raise RuntimeError("Unknown asset source! Must be asset directory or Minecraft jar file.")
 
-        self.blockstate_base = "minecraft/blockstates"
-        self.model_base = "minecraft/models"
-        self.texture_base = "minecraft/textures"
+        self.blockstate_base = "{prefix}/blockstates"
+        self.model_base = "{prefix}/models"
+        self.texture_base = "{prefix}/textures"
 
         self._model_json_cache = {}
         self._model_cache = {}
@@ -73,11 +73,12 @@ class Assets:
         filename = os.path.basename(path)
         assert filename.endswith(".json")
         name = filename.replace(".json", "")
-        return Blockstate(self, name, json.loads(self.source.load_file(path)))
+        prefix = path.split("/")[0]
+        return Blockstate(self, prefix, name, json.loads(self.source.load_file(path)))
 
     @property
     def blockstate_files(self):
-        return self.source.glob_files(os.path.join(self.blockstate_base, "*.json"))
+        return self.source.glob_files(os.path.join(self.blockstate_base.format(prefix="*"), "*.json"))
 
     @property
     def blockstates(self):
@@ -96,7 +97,8 @@ class Assets:
         elements = {}
 
         if "parent" in m:
-            parent = self._get_model_json(os.path.join(self.model_base, m["parent"] + ".json"))
+            prefix = path.split("/")[0]
+            parent = self._get_model_json(os.path.join(self.model_base.format(prefix=prefix), m["parent"] + ".json"))
             textures.update(parent["textures"])
             if "elements" in parent:
                 elements = parent["elements"]
@@ -116,13 +118,14 @@ class Assets:
         filename = os.path.basename(path)
         assert filename.endswith(".json")
         name = filename.replace(".json", "")
-        model = Model(self, name, self._get_model_json(path))
+        prefix = path.split("/")[0]
+        model = Model(self, prefix, name, self._get_model_json(path))
         self._model_cache[path] = model
         return model
 
     @property
     def model_files(self):
-        return self.source.glob_files(os.path.join(self.model_base, "block", "*.json"))
+        return self.source.glob_files(os.path.join(self.model_base.format(prefix="*"), "block", "*.json"))
 
     @property
     def models(self):
@@ -131,12 +134,13 @@ class Assets:
             models.append(self.get_model(path))
         return models
 
-    def load_texture(self, path):
-        return self.source.open_file(os.path.join(self.texture_base, path), mode="rb")
+    def load_texture(self, prefix, path):
+        return self.source.open_file(os.path.join(self.texture_base.format(prefix=prefix), path), mode="rb")
 
 class Blockstate:
-    def __init__(self, assets, name, data):
+    def __init__(self, assets, prefix, name, data):
         self.assets = assets
+        self.prefix = prefix
         self.name = name
         self.data = data
 
@@ -174,7 +178,7 @@ class Blockstate:
             model_name = modelref["model"]
             model_transformation = dict(modelref)
             del model_transformation["model"]
-            model = self.assets.get_model(os.path.join("minecraft/models", model_name + ".json"))
+            model = self.assets.get_model(os.path.join(self.prefix + "/models", model_name + ".json"))
             evaluated.append((model, model_transformation))
         return evaluated
 
@@ -234,11 +238,12 @@ class Blockstate:
         return variants
 
     def __repr__(self):
-        return "<Blockstate name=%s>" % self.name
+        return "<Blockstate prefix=%s name=%s>" % (self.prefix, self.name)
 
 class Model:
-    def __init__(self, assets, name, data):
+    def __init__(self, assets, prefix, name, data):
         self.assets = assets
+        self.prefix = prefix
         self.name = name
         self.data = data
 
@@ -252,7 +257,7 @@ class Model:
 
     def load_texture(self, texture):
         if not texture.startswith("#"):
-            return self.assets.load_texture(texture + ".png")
+            return self.assets.load_texture(self.prefix, texture + ".png")
             #return os.path.join(TEXTURE_BASE, texture + ".png")
         name = texture[1:]
         if not name in self.textures:
