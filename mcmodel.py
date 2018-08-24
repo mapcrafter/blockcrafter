@@ -285,6 +285,8 @@ def parse_variant(condition):
     return dict(map(lambda pair: pair.split("="), condition.split(",")))
 
 def encode_variant(variant):
+    if len(variant) == 0:
+        return "-"
     items = list(variant.items())
     items.sort(key = lambda i: i[0])
     return ",".join(map(lambda i: "=".join(i), items))

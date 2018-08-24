@@ -14,6 +14,22 @@ import render
 
 COLUMNS = 32
 
+def load_blockstate_properties():
+    properties = {}
+
+    path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "blockstates.properties")
+    f = open(path, "r")
+    for line in f.readlines():
+        line = line.strip()
+        parts = line.split(" ")
+        assert len(parts) == 2, "Invalid line '%s'" % line
+
+        name = parts[0]
+        p = mcmodel.parse_variant(parts[1])
+        properties[name] = p
+    f.close()
+    return properties
+
 class BlockImages:
     def __init__(self):
         self.blocks = []
@@ -53,6 +69,7 @@ class Canvas(app.Canvas):
             self.rotations = [0, 1, 2, 3]
 
         self.assets = mcmodel.Assets(args.assets)
+        self.extra_properties = load_blockstate_properties()
 
     def render_blocks(self, blockstates, texture_size, render_view, rotation, info_path, image_path):
         block_size = None
@@ -95,10 +112,11 @@ class Canvas(app.Canvas):
                     index = images.append(image)
                     indices.append(index)
 
-                variant_name = mcmodel.encode_variant(variant)
-                if variant_name == "":
-                    variant_name = "-"
-                print("%s:%s %s color=%d,uv=%d" % (blockstate.prefix, blockstate.name, variant_name, indices[0], indices[1]), file=finfo)
+                name = blockstate.prefix + ":" + blockstate.name
+                properties = {"color" : str(indices[0]), "uv" : str(indices[1])}
+                extra_properties = self.extra_properties.get(name, {})
+                properties.update(extra_properties)
+                print("%s %s %s" % (name, mcmodel.encode_variant(variant), mcmodel.encode_variant(properties)), file=finfo)
         images.export(columns=COLUMNS).save(image_path)
 
         finfo.close()
