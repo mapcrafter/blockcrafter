@@ -21,6 +21,8 @@ def load_blockstate_properties():
     f = open(path, "r")
     for line in f.readlines():
         line = line.strip()
+        if not line:
+            continue
         parts = line.split(" ")
         assert len(parts) == 2, "Invalid line '%s'" % line
 

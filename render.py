@@ -252,7 +252,7 @@ class Element:
 
         points = self.points[Element.CUBE_FACES[face_index]].astype(np.float32)
         normal = np.array(Element.CUBE_NORMALS[face_index], dtype=np.float32)
-        program["a_position"].set_data(points)
+        program["a_position"].set_data(points + 0.00001 * normal)
         program["a_normal"].set_data(np.stack([normal] * 4))
 
         uv0, uv1 = uvs
@@ -379,6 +379,10 @@ class Element:
             image = Image.open(f)
             if "rotation" in facedef:
                 image = image.rotate(-facedef["rotation"])
+            if image.size[0] != image.size[1]:
+                assert(image.size[0] < image.size[1])
+                s = image.size[0]
+                image = image.crop((0, 0, s, s))
             faces[direction] = (gloo.Texture2D(data=np.array(image)), (uv0, uv1))
             f.close()
 

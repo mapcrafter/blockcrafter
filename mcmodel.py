@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 
-import sys
 import os
 import glob
 import json
@@ -52,15 +51,44 @@ class JarFileSource:
         f.close()
         return data
 
+class MultipleSources:
+    def __init__(self, sources):
+        self.sources = sources
+
+    def glob_files(self, wildcard):
+        files = []
+        for source in self.sources:
+            files.extend(source.glob_files(wildcard))
+        return list(set(files))
+
+    def open_file(self, path, mode="r"):
+        for source in self.sources:
+            try:
+                f = source.open_file(path, mode)
+                return f
+            except Exception as e:
+                pass
+        raise RuntimeError("Unable to find file '%s' in any source!" % path)
+
+    def load_file(self, path):
+        f = self.open_file(path)
+        data = f.read()
+        f.close()
+        return data
+
 class Assets:
-    def __init__(self, source):
-        self.source = None
-        if os.path.isdir(source):
-            self.source = DirectorySource(source)
-        elif os.path.isfile(source) and source.endswith(".jar"):
-            self.source = JarFileSource(source)
+    def __init__(self, path):
+        source = None
+        if os.path.isdir(path):
+            source = DirectorySource(path)
+        elif os.path.isfile(path) and path.endswith(".jar"):
+            source = JarFileSource(path)
         else:
             raise RuntimeError("Unknown asset source! Must be asset directory or Minecraft jar file.")
+
+        # always also include some custom assets
+        custom_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_assets")
+        self.source = MultipleSources([DirectorySource(custom_path), source])
 
         self.blockstate_base = "{prefix}/blockstates"
         self.model_base = "{prefix}/models"

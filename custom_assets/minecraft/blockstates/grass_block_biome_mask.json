@@ -1,0 +1,11 @@
+{
+    "variants": {
+        "snowy=false": [
+            { "model": "block/grass_block_biome_mask" },
+            { "model": "block/grass_block_biome_mask", "y": 90 },
+            { "model": "block/grass_block_biome_mask", "y": 180 },
+            { "model": "block/grass_block_biome_mask", "y": 270 }
+        ],
+        "snowy=true":  { "model": "block/grass_block_snow_biome_mask" }
+    }
+}
