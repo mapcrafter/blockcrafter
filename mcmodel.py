@@ -19,7 +19,7 @@ class DirectorySource:
         self.path = path
 
     def glob_files(self, wildcard):
-        return [ os.path.relpath(p, self.path) for p in glob.glob(os.path.join(self.path, wildcard)) ]
+        return sorted([ os.path.relpath(p, self.path) for p in glob.glob(os.path.join(self.path, wildcard)) ])
 
     def open_file(self, path, mode="r"):
         return open(os.path.join(self.path, path), mode)
@@ -40,7 +40,7 @@ class JarFileSource:
         for path in self.zip.namelist():
             if fnmatch.fnmatch(path, wildcard):
                 files.append(os.path.relpath(path, "assets"))
-        return files
+        return sorted(files)
 
     def open_file(self, path, mode="r"):
         return self.zip.open("assets/" + path, mode="r")
