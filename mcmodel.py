@@ -59,7 +59,7 @@ class MultipleSources:
         files = []
         for source in self.sources:
             files.extend(source.glob_files(wildcard))
-        return list(set(files))
+        return sorted(list(set(files)))
 
     def open_file(self, path, mode="r"):
         for source in self.sources:
