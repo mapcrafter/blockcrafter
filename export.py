@@ -106,9 +106,10 @@ class Canvas(app.Canvas):
                 indices = []
                 for mode in modes:
                     gloo.clear(color=True, depth=True)
-
-                    actual_model = render.apply_model_rotation(model, rotation=rotation)
-                    glblock.render(variant, model, view, projection, mode=mode)
+                    
+                    if not self.args.no_render:
+                        actual_model = render.apply_model_rotation(model, rotation=rotation)
+                        glblock.render(variant, model, view, projection, mode=mode)
 
                     image = Image.fromarray(fbo.read("color"))
                     index = images.append(image)
@@ -119,7 +120,9 @@ class Canvas(app.Canvas):
                 extra_properties = self.extra_properties.get(name, {})
                 properties.update(extra_properties)
                 print("%s %s %s" % (name, mcmodel.encode_variant(variant), mcmodel.encode_variant(properties)), file=finfo)
-        images.export(columns=COLUMNS).save(image_path)
+
+        if not self.args.no_render:
+            images.export(columns=COLUMNS).save(image_path)
 
         finfo.close()
         fbo.deactivate()
@@ -145,6 +148,7 @@ class Canvas(app.Canvas):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Generate block images for Mapcrafter.")
     parser.add_argument("--osmesa", action="store_true")
+    parser.add_argument("--no-render", action="store_true")
     parser.add_argument("--texture-size", "-t", type=int, action="append")
     parser.add_argument("--view", "-v", type=str, action="append")
     parser.add_argument("--rotation", "-r", type=int, action="append")
