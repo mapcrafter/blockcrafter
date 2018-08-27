@@ -404,9 +404,9 @@ class Model:
     def render(self, model, view, projection, mode="color", modelref={}):
         m = np.eye(4, dtype=np.float32)
         if "x" in modelref:
-            m = np.dot(m, transforms.rotate(modelref["x"], (1, 0, 0)))
+            m = np.dot(m, transforms.rotate(-modelref["x"], (1, 0, 0)))
         if "y" in modelref:
-            m = np.dot(m, transforms.rotate(modelref["y"], (0, 1, 0)))
+            m = np.dot(m, transforms.rotate(-modelref["y"], (0, 1, 0)))
 
         uvlock = modelref.get("uvlock", False)
         for element in self.elements:
