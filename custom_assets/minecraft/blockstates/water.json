@@ -1,0 +1,21 @@
+{
+    "variants": {
+        "level=0": { "model": "block/water_0" },
+        "level=1": { "model": "block/water_1" },
+        "level=2": { "model": "block/water_2" },
+        "level=3": { "model": "block/water_3" },
+        "level=4": { "model": "block/water_4" },
+        "level=5": { "model": "block/water_5" },
+        "level=6": { "model": "block/water_6" },
+        "level=7": { "model": "block/water_7" },
+
+        "level=8": { "model": "block/water_0" },
+        "level=9": { "model": "block/water_1" },
+        "level=10": { "model": "block/water_2" },
+        "level=11": { "model": "block/water_3" },
+        "level=12": { "model": "block/water_4" },
+        "level=13": { "model": "block/water_5" },
+        "level=14": { "model": "block/water_6" },
+        "level=15": { "model": "block/water_7" }
+    }
+}

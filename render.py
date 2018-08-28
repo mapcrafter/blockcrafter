@@ -377,13 +377,19 @@ class Element:
             uvs = np.array(facedef.get("uv", [0, 0, 16, 16]), dtype=np.float32) / 16.0
             uv0, uv1 = uvs[:2], uvs[2:]
             image = Image.open(f)
-            if "rotation" in facedef:
-                image = image.rotate(-facedef["rotation"])
             if image.size[0] != image.size[1]:
                 assert(image.size[0] < image.size[1])
                 s = image.size[0]
                 image = image.crop((0, 0, s, s))
-            faces[direction] = (gloo.Texture2D(data=np.array(image)), (uv0, uv1))
+            if "rotation" in facedef:
+                image = image.rotate(-facedef["rotation"])
+            data = np.array(image)
+            if "blockcrafterTint" in facedef:
+                r, g, b = facedef["blockcrafterTint"]
+                data[:, :, 0] = data[:, :, 0] * r
+                data[:, :, 1] = data[:, :, 1] * g
+                data[:, :, 2] = data[:, :, 2] * b
+            faces[direction] = (gloo.Texture2D(data=data), (uv0, uv1))
             f.close()
 
         # gather faces in order for cube sides

@@ -1,0 +1,16 @@
+{
+    "multipart": [
+        {
+            "apply" : { "model" : "block/full_water_up" },
+            "when" : { "up" : "false" }
+        },
+        {
+            "apply" : { "model" : "block/full_water_south" },
+            "when" : { "south" : "false" }
+        },
+        {
+            "apply" : { "model" : "block/full_water_west" },
+            "when" : { "west" : "false" }
+        }
+    ]
+}

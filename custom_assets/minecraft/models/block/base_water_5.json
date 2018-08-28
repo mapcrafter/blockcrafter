@@ -1,0 +1,14 @@
+{
+    "parent": "block/water",
+    "elements": [
+        {   "from": [ 0, 0, 0 ],
+            "to": [ 16, 6, 16 ],
+            "faces": {
+                "up":    { "texture": "#water", "cullface": "up", "blockcrafterTint" : [0, 0.39, 0.89] },
+                "south": { "uv" : [0, 10, 16, 16], "texture": "#water", "cullface": "south", "blockcrafterTint" : [0, 0.39, 0.89] },
+                "west":  { "uv" : [0, 10, 16, 16], "texture": "#water", "cullface": "west", "blockcrafterTint" : [0, 0.39, 0.89] }
+            }
+        }
+    ]
+}
+

@@ -62,9 +62,11 @@ class Canvas(app.Canvas):
 
         if event.key == "Left":
             self.rotation_index = (self.rotation_index - 1) % len(rotations)
+            print("Rendering rotation %d: %s" % (self.rotation_index, rotations[self.rotation_index]))
 
         if event.key == "Right":
             self.rotation_index = (self.rotation_index + 1) % len(rotations)
+            print("Rendering rotation %d: %s" % (self.rotation_index, rotations[self.rotation_index]))
 
         if event.key == "Down":
             self.variant_index = (self.variant_index - 1) % len(variants)
@@ -86,7 +88,8 @@ class Canvas(app.Canvas):
         self.update()
 
     def on_draw(self, event):
-        gloo.set_state(depth_test=True, blend=True)
+        # includes depth=True, etc.
+        gloo.set_state("translucent")
 
         gloo.set_clear_color((0.30, 0.30, 0.35, 1.00))
         gloo.clear(color=True, depth=True)

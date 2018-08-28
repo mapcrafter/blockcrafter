@@ -1,0 +1,7 @@
+{
+    "parent": "block/base_water_4",
+    "textures": {
+        "water" : "block/water_flow"
+    }
+}
+

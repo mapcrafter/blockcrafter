@@ -1,0 +1,14 @@
+{
+    "variants": {
+        "level=0": { "model": "block/flowing_water_7" },
+        "level=1": { "model": "block/flowing_water_6" },
+        "level=2": { "model": "block/flowing_water_5" },
+        "level=3": { "model": "block/flowing_water_4" },
+        "level=4": { "model": "block/flowing_water_3" },
+        "level=5": { "model": "block/flowing_water_2" },
+        "level=6": { "model": "block/flowing_water_1" },
+        "level=7": { "model": "block/flowing_water_0" },
+
+        "level=8": { "model": "block/flowing_water_0" }
+    }
+}
