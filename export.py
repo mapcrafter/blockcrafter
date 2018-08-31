@@ -14,24 +14,6 @@ import render
 
 COLUMNS = 32
 
-def load_blockstate_properties():
-    properties = {}
-
-    path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "blockstates.properties")
-    f = open(path, "r")
-    for line in f.readlines():
-        line = line.strip()
-        if not line:
-            continue
-        parts = line.split(" ")
-        assert len(parts) == 2, "Invalid line '%s'" % line
-
-        name = parts[0]
-        p = mcmodel.parse_variant(parts[1])
-        properties[name] = p
-    f.close()
-    return properties
-
 class BlockImages:
     def __init__(self):
         self.blocks = []
@@ -62,16 +44,15 @@ class Canvas(app.Canvas):
         self.args = args
         self.texture_sizes = args.texture_size
         if self.texture_sizes is None:
-            self.texture_sizes = [16]
+            self.texture_sizes = [16, 12]
         self.views = args.view
         if self.views is None:
-            self.views = ["isometric"]
+            self.views = ["isometric", "topdown"]
         self.rotations = args.rotation
         if self.rotations is None:
             self.rotations = [0, 1, 2, 3]
 
         self.assets = mcmodel.Assets(args.assets)
-        self.extra_properties = load_blockstate_properties()
 
     def render_blocks(self, blockstates, texture_size, render_view, rotation, info_path, image_path):
         block_size = None
@@ -116,9 +97,9 @@ class Canvas(app.Canvas):
                     indices.append(index)
 
                 name = blockstate.prefix + ":" + blockstate.name
-                properties = {"color" : str(indices[0]), "uv" : str(indices[1])}
-                extra_properties = self.extra_properties.get(name, {})
-                properties.update(extra_properties)
+                properties = dict(blockstate.extra_properties)
+                properties["color"] = str(indices[0])
+                properties["uv"] = str(indices[1])
                 print("%s %s %s" % (name, mcmodel.encode_variant(variant), mcmodel.encode_variant(properties)), file=finfo)
 
         if not self.args.no_render:
@@ -136,6 +117,8 @@ class Canvas(app.Canvas):
         path_template = "{view}_{rotation}_{texture_size}"
         blockstates = self.assets.blockstates
         for texture_size, view, rotation in itertools.product(self.texture_sizes, self.views, self.rotations):
+            if view == "topdown" and rotation != 0:
+                continue
             name = path_template.format(texture_size=texture_size, view=view, rotation=rotation)
 
             info_path = os.path.join(self.args.output_dir, name + ".txt")

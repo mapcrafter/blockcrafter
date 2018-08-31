@@ -10,9 +10,9 @@ from vispy.util import transforms
 import mcmodel
 import render
 
-assets = mcmodel.Assets("assets")
+assets = mcmodel.Assets("1.13.1.jar")
 #blockstate = random.choice(assets.blockstates)
-blockstate = assets.get_blockstate("minecraft/blockstates/repeating_command_block.json")
+blockstate = assets.get_blockstate("minecraft/blockstates/pink_stained_glass_pane.json")
 
 glblock = render.Block(blockstate)
 variants = blockstate.variants

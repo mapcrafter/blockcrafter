@@ -14,6 +14,24 @@ import itertools
 # blockdef: json structure like models/*.json
 # variant: a dictionary showing mapping of values to variables
 
+def load_blockstate_properties():
+    properties = {}
+
+    path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "blockstates.properties")
+    f = open(path, "r")
+    for line in f.readlines():
+        line = line.strip()
+        if not line:
+            continue
+        parts = line.split(" ")
+        assert len(parts) == 2, "Invalid line '%s'" % line
+
+        name = parts[0]
+        p = parse_variant(parts[1])
+        properties[name] = p
+    f.close()
+    return properties
+
 class DirectorySource:
     def __init__(self, path):
         self.path = path
@@ -97,12 +115,15 @@ class Assets:
         self._model_json_cache = {}
         self._model_cache = {}
 
+        self._blockstate_properties = load_blockstate_properties()
+
     def get_blockstate(self, path):
         filename = os.path.basename(path)
         assert filename.endswith(".json")
         name = filename.replace(".json", "")
         prefix = path.split("/")[0]
-        return Blockstate(self, prefix, name, json.loads(self.source.load_file(path)))
+        properties = self._blockstate_properties.get(prefix + ":" + name, {})
+        return Blockstate(self, prefix, name, json.loads(self.source.load_file(path)), properties=properties)
 
     @property
     def blockstate_files(self):
@@ -166,13 +187,19 @@ class Assets:
         return self.source.open_file(os.path.join(self.texture_base.format(prefix=prefix), path), mode="rb")
 
 class Blockstate:
-    def __init__(self, assets, prefix, name, data):
+    def __init__(self, assets, prefix, name, data, properties={}):
         self.assets = assets
         self.prefix = prefix
         self.name = name
         self.data = data
 
+        self.extra_properties = properties
+        self.waterloggable = properties.get("is_waterloggable", "") == "true"
+        self.inherently_waterlogged = properties.get("inherently_waterlogged", "") == "true"
+
         self.properties = self._get_properties()
+        if self.waterloggable:
+            self.properties["waterlogged"] = ["true", "false"]
         self.variants = self._get_variants(self.properties)
     
     def evaluate_variant(self, variant):
@@ -197,6 +224,9 @@ class Blockstate:
                         modelrefs.append(part["apply"])
         else:
             assert False, "There must be variants defined!"
+
+        if self.waterloggable and variant.get("waterlogged", "true") == "true":
+            modelrefs.append({"model" : "block/waterlog"})
 
         evaluated = []
         for modelref in modelrefs:
@@ -262,7 +292,11 @@ class Blockstate:
 
         variants = []
         for product in sorted(itertools.product(*values)):
-            variants.append(dict(list(zip(keys, product))))
+            variant = dict(list(zip(keys, product)))
+            if self.waterloggable and self.inherently_waterlogged:
+                if variant["waterlogged"] == "true":
+                    del variant["waterlogged"]
+            variants.append(variant)
         return variants
 
     def __repr__(self):
