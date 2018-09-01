@@ -86,11 +86,13 @@ class Canvas(app.Canvas):
                 modes = ["color", "uv"]
                 indices = []
                 for mode in modes:
-                    gloo.clear(color=True, depth=True)
-                    
                     if not self.args.no_render:
+                        gloo.clear(color=True, depth=True)
+                        actual_rotation = rotation
+                        if blockstate.prefix + ":" + blockstate.name == "minecraft:full_water":
+                            actual_rotation = 0
                         actual_model = render.apply_model_rotation(model, rotation=rotation)
-                        glblock.render(variant, model, view, projection, mode=mode)
+                        glblock.render(variant, actual_model, view, projection, mode=mode)
 
                     image = Image.fromarray(fbo.read("color"))
                     index = images.append(image)

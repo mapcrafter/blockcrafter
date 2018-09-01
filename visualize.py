@@ -78,7 +78,7 @@ class Canvas(app.Canvas):
         if event.key == "m":
             self.mode_index = (self.mode_index + 1) % len(modes)
 
-        if event.key == "Space":
+        if event.key == "Space" or event.key == " ":
             self.run_phi = not self.run_phi
 
         if event.key == ord("Q"):
