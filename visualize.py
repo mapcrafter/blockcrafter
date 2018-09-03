@@ -12,7 +12,7 @@ import render
 
 assets = mcmodel.Assets("1.13.1.jar")
 #blockstate = random.choice(assets.blockstates)
-blockstate = assets.get_blockstate("minecraft/blockstates/pink_stained_glass_pane.json")
+blockstate = assets.get_blockstate("minecraft:dirt")
 
 glblock = render.Block(blockstate)
 variants = blockstate.variants
@@ -20,7 +20,7 @@ print("Block has variants:")
 for variant in variants:
     print("-", variant)
 
-views = ["perspective", "ortho", "fake_ortho"]
+views = ["perspective", "isometric", "topdown"]
 rotations = ["top-left", "top-right", "bottom-right", "bottom-left"]
 modes = ["color", "uv"]
 
@@ -101,10 +101,10 @@ class Canvas(app.Canvas):
 
             if v == "perspective":
                 self.model, self.view, self.projection = render.create_transform_perspective(aspect=aspect)
-            elif v == "ortho":
-                self.model, self.view, self.projection = render.create_transform_ortho(aspect=aspect, fake_ortho=False)
-            elif v == "fake_ortho":
-                self.model, self.view, self.projection = render.create_transform_ortho(aspect=aspect, fake_ortho=True)
+            elif v == "isometric":
+                self.model, self.view, self.projection = render.create_transform_ortho(aspect=aspect, view="isometric", fake_ortho=True)
+            elif v == "topdown":
+                self.model, self.view, self.projection = render.create_transform_ortho(aspect=aspect, view="topdown", fake_ortho=True)
             else:
                 assert False, "Invalid view type '%s'" % view
 

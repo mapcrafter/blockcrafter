@@ -117,12 +117,10 @@ class Assets:
 
         self._blockstate_properties = load_blockstate_properties()
 
-    def get_blockstate(self, path):
-        filename = os.path.basename(path)
-        assert filename.endswith(".json")
-        name = filename.replace(".json", "")
-        prefix = path.split("/")[0]
-        properties = self._blockstate_properties.get(prefix + ":" + name, {})
+    def get_blockstate(self, identifier):
+        prefix, name = identifier.split(":")
+        path = os.path.join(self.blockstate_base.format(prefix=prefix), name + ".json")
+        properties = self._blockstate_properties.get(identifier, {})
         return Blockstate(self, prefix, name, json.loads(self.source.load_file(path)), properties=properties)
 
     @property
@@ -133,7 +131,11 @@ class Assets:
     def blockstates(self):
         blockstates = []
         for path in self.blockstate_files:
-            blockstates.append(self.get_blockstate(path))
+            filename = os.path.basename(path)
+            assert filename.endswith(".json")
+            name = filename.replace(".json", "")
+            prefix = path.split("/")[0]
+            blockstates.append(self.get_blockstate(prefix + ":" + name))
         return blockstates
 
     def _get_model_json(self, path):
