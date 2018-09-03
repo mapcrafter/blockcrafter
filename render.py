@@ -106,7 +106,8 @@ void main() {
         discard;
     }
 
-    gl_FragColor = vec4(vec3(v_texcoord.xy, float(u_face_index) / 6.0), 1.0);
+    float face = float(u_face_index) / 6.0;
+    gl_FragColor = vec4(vec3(v_texcoord.xy, face), 1.0);
 }
 """
 
@@ -243,7 +244,7 @@ class Element:
         self.points = np.array(Element.CUBE_POINTS) * self.scale + self.translate
         self.indices = gloo.IndexBuffer(np.array([0, 1, 2, 0, 2, 3], dtype=np.uint32))
 
-    def render_face(self, face_index, texture, uvs, model, view, projection, element_transform, uvlock):
+    def render_face(self, face_index, texture, uvs, model, view, projection, element_rotation, element_transform, uvlock):
         program = self.current_program
 
         # ---
@@ -302,9 +303,10 @@ class Element:
 
         program["u_texture"] = texture
         program["u_light_direction"] = [-0.1, 1.0, 1.0]
-        
+
         # we pass index of face to shader too
         # (mostly for the shader that exports uv coordinates)
+
         if uvlock:
             # find face index if element wouldn't be rotated (as which face it appears to viewer)
             # faces rotated not by x*90 degrees just get face index 6
@@ -331,21 +333,22 @@ class Element:
         #if direction < 0:
         #    draw_line(center, center + normal * 0.25, model, view, projection, (1.0, 0.0, 0.0, 1.0))
 
-    def render(self, model, view, projection, mode="color", element_transform=np.eye(4, dtype=np.float32), uvlock=False):
-        rotation = np.eye(4, dtype=np.float32)
+    def render(self, model, view, projection, mode="color", block_rotation=0, element_transform=np.eye(4, dtype=np.float32), uvlock=False):
+        element_rotation = np.eye(4, dtype=np.float32)
         if self.rotation:
             rotationdef = self.rotation
             axis = {"x" : [1, 0, 0],
                     "y" : [0, 1, 0],
                     "z" : [0, 0, 1]}[rotationdef["axis"]]
             origin = (np.array(rotationdef.get("origin", [8, 8, 8]), dtype=np.float32) - 8.0) / 16.0 * 2.0
-            rotation = np.dot(transforms.translate(-origin), np.dot(transforms.rotate(rotationdef["angle"], axis), transforms.translate(origin)))
+            element_rotation = np.dot(transforms.translate(-origin), np.dot(transforms.rotate(rotationdef["angle"], axis), transforms.translate(origin)))
 
         program = Element.get_program(mode)
         self.current_program = program
 
-        # add rotation of element to element transformation
-        element_transform = np.dot(rotation, element_transform)
+        # add rotation of block and element to element transformation
+        block_rotation = transforms.rotate(-90 * block_rotation, (0, 1, 0))
+        element_transform = np.dot(element_rotation, np.dot(element_transform, block_rotation))
         complete_model = np.dot(element_transform, model)
         program["u_model"] = complete_model
         program["u_view"] = view
@@ -355,7 +358,7 @@ class Element:
         for i, (texture, uvs) in enumerate(self.faces):
             if texture is None:
                 continue
-            self.render_face(i, texture, uvs, complete_model, view, projection, element_transform=element_transform, uvlock=uvlock or mode == "uv")
+            self.render_face(i, texture, uvs, complete_model, view, projection, element_rotation=element_rotation, element_transform=element_transform, uvlock=uvlock or mode == "uv")
 
     @staticmethod
     def load_faces(model, element):
@@ -407,7 +410,7 @@ class Model:
         for elementdef in modeldef.elements:
             self.elements.append(Element(modeldef, elementdef))
 
-    def render(self, model, view, projection, mode="color", modelref={}):
+    def render(self, model, view, projection, block_rotation=0, mode="color", modelref={}):
         m = np.eye(4, dtype=np.float32)
         if "x" in modelref:
             m = np.dot(m, transforms.rotate(-modelref["x"], (1, 0, 0)))
@@ -416,7 +419,7 @@ class Model:
 
         uvlock = modelref.get("uvlock", False)
         for element in self.elements:
-            element.render(model, view, projection, mode=mode, element_transform=m, uvlock=uvlock)
+            element.render(model, view, projection, mode=mode, block_rotation=block_rotation, element_transform=m, uvlock=uvlock)
 
 class Block:
     def __init__(self, blockstate):
@@ -432,14 +435,14 @@ class Block:
             modelrefs.append((self.models[model.name], transformation))
         return modelrefs
 
-    def render(self, variant, model, view, projection, mode="color"):
+    def render(self, variant, model, view, projection, rotation=0, mode="color"):
         variant_str = mcmodel.encode_variant(variant)
         if variant_str not in self.variants:
             self.variants[variant_str] = self._load_variant(variant)
 
         modelrefs = self.variants[variant_str]
         for glmodel, transformation  in modelrefs:
-            glmodel.render(model, view, projection, mode=mode, modelref=transformation)
+            glmodel.render(model, view, projection, block_rotation=rotation, mode=mode, modelref=transformation)
 
 def create_transform_ortho(aspect=1.0, view="isometric", fake_ortho=True):
     model = np.eye(4, dtype=np.float32)
