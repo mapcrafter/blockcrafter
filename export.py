@@ -72,11 +72,16 @@ class Canvas(app.Canvas):
 
         gloo.set_viewport(0, 0, block_size, block_size)
         gloo.set_clear_color((0.0, 0.0, 0.0, 0.0))
-        gloo.set_state(depth_test=True, blend=True)
-        total_variants = sum([ len(b.variants) for b in blockstates ])
+
+        #gloo.set_state("translucent")
+        # like translucent, but with premulitplied alpha on source
+        gloo.set_state(blend=True, depth_test=True)
+        gloo.gl.glBlendEquationSeparate(gloo.gl.GL_FUNC_ADD, gloo.gl.GL_FUNC_ADD)
+        gloo.gl.glBlendFuncSeparate(gloo.gl.GL_ONE, gloo.gl.GL_ONE_MINUS_SRC_ALPHA, gloo.gl.GL_ONE, gloo.gl.GL_ONE_MINUS_SRC_ALPHA)
 
         os.makedirs(self.args.output_dir, exist_ok=True)
         finfo = open(info_path, "w")
+        total_variants = sum([ len(b.variants) for b in blockstates ])
         print("%d %d" % (total_variants, COLUMNS), file=finfo)
 
         images = BlockImages()
@@ -89,10 +94,10 @@ class Canvas(app.Canvas):
                     if not self.args.no_render:
                         gloo.clear(color=True, depth=True)
                         actual_rotation = rotation
-                        if blockstate.prefix + ":" + blockstate.name == "minecraft:full_water":
+                        if blockstate.prefix + ":" + blockstate.name in ("minecraft:full_water", "minecraft:ice"):
                             actual_rotation = 0
-                        actual_model = render.apply_model_rotation(model, rotation=rotation)
-                        glblock.render(variant, actual_model, view, projection, mode=mode)
+                        actual_model = render.apply_model_rotation(model, rotation=0)
+                        glblock.render(variant, actual_model, view, projection, rotation=actual_rotation, mode=mode)
 
                     image = Image.fromarray(fbo.read("color"))
                     index = images.append(image)
