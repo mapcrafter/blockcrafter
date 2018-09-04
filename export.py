@@ -84,6 +84,13 @@ class Canvas(app.Canvas):
         total_variants = sum([ len(b.variants) for b in blockstates ])
         print("%d %d" % (total_variants, COLUMNS), file=finfo)
 
+        def write_block_info(blockstate, variant, indices):
+            name = blockstate.prefix + ":" + blockstate.name
+            properties = dict(blockstate.extra_properties)
+            properties["color"] = str(indices[0])
+            properties["uv"] = str(indices[1])
+            print("%s %s %s" % (name, mcmodel.encode_variant(variant), mcmodel.encode_variant(properties)), file=finfo)
+
         images = BlockImages()
         for blockstate in blockstates:
             glblock = render.Block(blockstate)
@@ -102,12 +109,18 @@ class Canvas(app.Canvas):
                     image = Image.fromarray(fbo.read("color"))
                     index = images.append(image)
                     indices.append(index)
+                
+                write_block_info(blockstate, variant, indices)
+                if blockstate.waterloggable and variant.get("waterlogged", "") == "false":
+                    variant = dict(variant)
+                    variant["was_waterlogged"] = "true"
+                    write_block_info(blockstate, variant, indices)
 
-                name = blockstate.prefix + ":" + blockstate.name
-                properties = dict(blockstate.extra_properties)
-                properties["color"] = str(indices[0])
-                properties["uv"] = str(indices[1])
-                print("%s %s %s" % (name, mcmodel.encode_variant(variant), mcmodel.encode_variant(properties)), file=finfo)
+                #name = blockstate.prefix + ":" + blockstate.name
+                #properties = dict(blockstate.extra_properties)
+                #properties["color"] = str(indices[0])
+                #properties["uv"] = str(indices[1])
+                #print("%s %s %s" % (name, mcmodel.encode_variant(variant), mcmodel.encode_variant(properties)), file=finfo)
 
         if not self.args.no_render:
             images.export(columns=COLUMNS).save(image_path)
@@ -124,8 +137,6 @@ class Canvas(app.Canvas):
         path_template = "{view}_{rotation}_{texture_size}"
         blockstates = self.assets.blockstates
         for texture_size, view, rotation in itertools.product(self.texture_sizes, self.views, self.rotations):
-            if view == "topdown" and rotation != 0:
-                continue
             name = path_template.format(texture_size=texture_size, view=view, rotation=rotation)
 
             info_path = os.path.join(self.args.output_dir, name + ".txt")
