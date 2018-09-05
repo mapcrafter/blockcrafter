@@ -73,11 +73,7 @@ class Canvas(app.Canvas):
         gloo.set_viewport(0, 0, block_size, block_size)
         gloo.set_clear_color((0.0, 0.0, 0.0, 0.0))
 
-        #gloo.set_state("translucent")
-        # like translucent, but with premulitplied alpha on source
-        gloo.set_state(blend=True, depth_test=True)
-        gloo.gl.glBlendEquationSeparate(gloo.gl.GL_FUNC_ADD, gloo.gl.GL_FUNC_ADD)
-        gloo.gl.glBlendFuncSeparate(gloo.gl.GL_ONE, gloo.gl.GL_ONE_MINUS_SRC_ALPHA, gloo.gl.GL_ONE, gloo.gl.GL_ONE_MINUS_SRC_ALPHA)
+        render.set_blending("premultiplied")
 
         os.makedirs(self.args.output_dir, exist_ok=True)
         finfo = open(info_path, "w")
@@ -106,7 +102,12 @@ class Canvas(app.Canvas):
                         actual_model = render.apply_model_rotation(model, rotation=0)
                         glblock.render(variant, actual_model, view, projection, rotation=actual_rotation, mode=mode)
 
-                    image = Image.fromarray(fbo.read("color"))
+                    array = np.array(fbo.read("color"))
+                    if blockstate.prefix + ":" + blockstate.name == "minecraft:ice":
+                        # make image opaque
+                        if mode == "color":
+                            array[:, :, 3] = (array[:, :, 3] > 0) * 255
+                    image = Image.fromarray(array)
                     index = images.append(image)
                     indices.append(index)
                 

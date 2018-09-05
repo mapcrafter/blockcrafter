@@ -91,14 +91,8 @@ class Canvas(app.Canvas):
         self.update()
 
     def on_draw(self, event):
-        # includes depth=True, etc.
         blending_mode = blending_modes[self.blending_mode_index]
-        if blending_mode == "premultiplied":
-            gloo.set_state(blend=True, depth_test=True)
-            gloo.gl.glBlendEquationSeparate(gloo.gl.GL_FUNC_ADD, gloo.gl.GL_FUNC_ADD)
-            gloo.gl.glBlendFuncSeparate(gloo.gl.GL_ONE, gloo.gl.GL_ONE_MINUS_SRC_ALPHA, gloo.gl.GL_ONE, gloo.gl.GL_ONE_MINUS_SRC_ALPHA)
-        else:
-            gloo.set_state(blending_mode)
+        render.set_blending(blending_mode)
 
         gloo.set_clear_color((0.30, 0.30, 0.35, 1.00))
         gloo.clear(color=True, depth=True)

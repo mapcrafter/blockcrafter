@@ -477,3 +477,11 @@ def create_transform_perspective(aspect=1.0):
 def apply_model_rotation(model, rotation=0, phi=0.0):
     rotation = transforms.rotate(-rotation * 90 + phi, (0, 1, 0))
     return np.dot(rotation, model)
+
+def set_blending(mode):
+    if mode == "premultiplied":
+        gloo.set_state(blend=True, depth_test=True)
+        gloo.gl.glBlendEquationSeparate(gloo.gl.GL_FUNC_ADD, gloo.gl.GL_FUNC_ADD)
+        gloo.gl.glBlendFuncSeparate(gloo.gl.GL_ONE, gloo.gl.GL_ONE_MINUS_SRC_ALPHA, gloo.gl.GL_ONE, gloo.gl.GL_ONE_MINUS_SRC_ALPHA)
+    else:
+        gloo.set_state(mode, clear_color=(0.0, 0.0, 0.0, 0.0))
