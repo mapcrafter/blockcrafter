@@ -89,6 +89,7 @@ class Canvas(app.Canvas):
 
         images = BlockImages()
         for blockstate in blockstates:
+            name = blockstate.prefix + ":" + blockstate.name
             glblock = render.Block(blockstate)
             for index, variant in enumerate(blockstate.variants):
                 modes = ["color", "uv"]
@@ -97,13 +98,17 @@ class Canvas(app.Canvas):
                     if not self.args.no_render:
                         gloo.clear(color=True, depth=True)
                         actual_rotation = rotation
-                        if blockstate.prefix + ":" + blockstate.name in ("minecraft:full_water", "minecraft:ice"):
+                        if name in ("minecraft:full_water", "minecraft:ice"):
                             actual_rotation = 0
+                        if name == "minecraft:ice":
+                            render.set_blending("opaque")
+                        else:
+                            render.set_blending("premultiplied")
                         actual_model = render.apply_model_rotation(model, rotation=0)
                         glblock.render(variant, actual_model, view, projection, rotation=actual_rotation, mode=mode)
 
                     array = np.array(fbo.read("color"))
-                    if blockstate.prefix + ":" + blockstate.name == "minecraft:ice":
+                    if name == "minecraft:ice":
                         # make image opaque
                         if mode == "color":
                             array[:, :, 3] = (array[:, :, 3] > 0) * 255
