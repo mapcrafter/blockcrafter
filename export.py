@@ -98,7 +98,7 @@ class Canvas(app.Canvas):
                     if not self.args.no_render:
                         gloo.clear(color=True, depth=True)
                         actual_rotation = rotation
-                        if name in ("minecraft:full_water", "minecraft:ice"):
+                        if name == "minecraft:full_water":
                             actual_rotation = 0
                         if name == "minecraft:ice":
                             render.set_blending("opaque")

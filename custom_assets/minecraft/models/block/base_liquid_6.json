@@ -1,0 +1,14 @@
+{
+    "parent": "block/water",
+    "elements": [
+        {   "from": [ 0, 0, 0 ],
+            "to": [ 16, 4, 16 ],
+            "faces": {
+                "up":    { "texture": "#water", "cullface": "up" },
+                "south": { "uv" : [0, 12, 16, 16], "texture": "#water", "cullface": "south" },
+                "west":  { "uv" : [0, 12, 16, 16], "texture": "#water", "cullface": "west" }
+            }
+        }
+    ]
+}
+

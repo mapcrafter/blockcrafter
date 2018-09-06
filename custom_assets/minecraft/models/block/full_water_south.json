@@ -7,7 +7,7 @@
         {   "from": [ 0, 0, 0 ],
             "to": [ 16, 16, 16 ],
             "faces": {
-                "south": { "uv" : [0, 0, 16, 16], "texture": "#water", "cullface": "south", "blockcrafterTint" : [0, 0.39, 0.89] }
+                "south": { "uv" : [0, 0, 16, 16], "texture": "#water", "cullface": "south" }
             }
         }
     ]

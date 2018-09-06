@@ -227,9 +227,6 @@ class Blockstate:
         else:
             assert False, "There must be variants defined!"
 
-        if self.waterloggable and variant.get("waterlogged", "true") == "true":
-            modelrefs.append({"model" : "block/waterlog"})
-
         evaluated = []
         for modelref in modelrefs:
             # TODO
