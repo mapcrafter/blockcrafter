@@ -1,7 +1,7 @@
 {
     "parent": "block/base_liquid_2",
     "textures": {
-        "texture" : "block/water_flow"
+        "texture" : "block/lava_flow"
     }
 }
 
