@@ -6,6 +6,7 @@ import numpy as np
 import math
 import argparse
 import itertools
+import fnmatch
 from PIL import Image
 from vispy import app, gloo, io, geometry
 
@@ -80,6 +81,15 @@ class Canvas(app.Canvas):
         total_variants = sum([ len(b.variants) for b in blockstates ])
         print("%d %d" % (total_variants, COLUMNS), file=finfo)
 
+        def is_blockstate_included(name):
+            patterns = args.blocks
+            if patterns is None:
+                return True
+            for pattern in patterns:
+                if fnmatch.fnmatch(name, pattern):
+                    return True
+            return False
+
         def write_block_info(blockstate, variant, indices):
             name = blockstate.prefix + ":" + blockstate.name
             properties = dict(blockstate.extra_properties)
@@ -90,6 +100,8 @@ class Canvas(app.Canvas):
         images = BlockImages()
         for blockstate in blockstates:
             name = blockstate.prefix + ":" + blockstate.name
+            if not is_blockstate_included(name):
+                continue
             glblock = render.Block(blockstate)
             for index, variant in enumerate(blockstate.variants):
                 modes = ["color", "uv"]
@@ -160,6 +172,7 @@ if __name__ == "__main__":
     parser.add_argument("--view", "-v", type=str, action="append")
     parser.add_argument("--rotation", "-r", type=int, action="append")
     parser.add_argument("--assets", "-a", type=str, required=True)
+    parser.add_argument("--blocks", "-b", type=str, action="append")
     parser.add_argument("--output-dir", "-o", type=str, required=True)
 
     args = parser.parse_args()
