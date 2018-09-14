@@ -461,6 +461,14 @@ def create_transform_ortho(aspect=1.0, view="isometric", fake_ortho=True):
         model = np.dot(model, np.dot(transforms.rotate(45, (0, 1, 0)), transforms.rotate(30, (1, 0, 0))))
     elif view == "topdown":
         model = np.dot(model, transforms.rotate(90, (1, 0, 0)))
+    elif view == "side":
+        # same thing with scaling factor as with isometric view
+        #f = 1.0 / math.sqrt(2)
+        f = 0.5 / math.cos(math.radians(45))
+        model = np.dot(model, transforms.scale((f / math.cos(math.radians(45)), f, f)))
+        model = np.dot(model, transforms.rotate(45, (1, 0, 0)))
+    elif view == "default":
+        pass
     else:
         assert False, "Invalid view '%s'!" % view
 

@@ -31,7 +31,7 @@ class BlockImages:
             assert block.size == (w, h)
             x = i % columns
             y = (i - x) // columns
-            image.paste(block, (x * h, y * h))
+            image.paste(block, (x * w, y * h))
         return image
 
 class Canvas(app.Canvas):
@@ -48,7 +48,7 @@ class Canvas(app.Canvas):
             self.texture_sizes = [16, 12]
         self.views = args.view
         if self.views is None:
-            self.views = ["isometric", "topdown"]
+            self.views = ["isometric", "topdown", "side"]
         self.rotations = args.rotation
         if self.rotations is None:
             self.rotations = [0, 1, 2, 3]
@@ -58,28 +58,29 @@ class Canvas(app.Canvas):
     def render_blocks(self, blockstates, texture_size, render_view, rotation, info_path, image_path):
         block_size = None
         if render_view == "isometric":
-            block_size = texture_size * 2
+            block_size = texture_size * 2, texture_size * 2
         elif render_view == "topdown":
-            block_size = texture_size
+            block_size = texture_size, texture_size
+        elif render_view == "side":
+            block_size = (int(math.sqrt(2) * texture_size), texture_size)
         else:
             assert False, "Invalid view '%s'" % view
 
         model, view, projection = render.create_transform_ortho(aspect=1.0, view=render_view, fake_ortho=True)
 
-        texture = gloo.Texture2D(shape=(block_size, block_size, 4))
-        depth = gloo.RenderBuffer(shape=(block_size, block_size))
+        texture = gloo.Texture2D(shape=block_size + (4,))
+        depth = gloo.RenderBuffer(shape=block_size)
         fbo = gloo.FrameBuffer(color=texture, depth=depth)
         fbo.activate()
 
-        gloo.set_viewport(0, 0, block_size, block_size)
+        gloo.set_viewport(0, 0, block_size[1], block_size[0])
         gloo.set_clear_color((0.0, 0.0, 0.0, 0.0))
 
         render.set_blending("premultiplied")
 
         os.makedirs(self.args.output_dir, exist_ok=True)
         finfo = open(info_path, "w")
-        total_variants = sum([ len(b.variants) for b in blockstates ])
-        print("%d %d" % (total_variants, COLUMNS), file=finfo)
+        print("%d %d %d" % (block_size[1], block_size[0], COLUMNS), file=finfo)
 
         def is_blockstate_included(name):
             patterns = args.blocks

@@ -104,12 +104,8 @@ class Canvas(app.Canvas):
 
             if v == "perspective":
                 self.model, self.view, self.projection = render.create_transform_perspective(aspect=aspect)
-            elif v == "isometric":
-                self.model, self.view, self.projection = render.create_transform_ortho(aspect=aspect, view="isometric", fake_ortho=True)
-            elif v == "topdown":
-                self.model, self.view, self.projection = render.create_transform_ortho(aspect=aspect, view="topdown", fake_ortho=True)
             else:
-                assert False, "Invalid view type '%s'" % view
+                self.model, self.view, self.projection = render.create_transform_ortho(aspect=aspect, view=v, fake_ortho=True)
 
         rotation = self.rotation_index
         if self.run_phi:
