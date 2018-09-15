@@ -379,7 +379,7 @@ class Element:
                 raise RuntimeError("Face in direction '%s' has no texture associated" % direction)
             uvs = np.array(facedef.get("uv", [0, 0, 16, 16]), dtype=np.float32) / 16.0
             uv0, uv1 = uvs[:2], uvs[2:]
-            image = Image.open(f)
+            image = Image.open(f).convert("RGBA")
             if image.size[0] != image.size[1]:
                 assert(image.size[0] < image.size[1])
                 s = image.size[0]
