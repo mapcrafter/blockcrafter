@@ -53,7 +53,7 @@ class Canvas(app.Canvas):
         if self.rotations is None:
             self.rotations = [0, 1, 2, 3]
 
-        self.assets = mcmodel.Assets(args.assets)
+        self.assets = mcmodel.Assets.create(self.args.assets)
 
     def render_blocks(self, blockstates, texture_size, render_view, rotation, info_path, image_path):
         block_size = None
@@ -62,7 +62,11 @@ class Canvas(app.Canvas):
         elif render_view == "topdown":
             block_size = texture_size, texture_size
         elif render_view == "side":
-            block_size = (int(math.sqrt(2) * texture_size), texture_size)
+            w = texture_size
+            h = math.sqrt(2) * texture_size
+            # make h integer and even:
+            h = int(math.floor(h / 2) * 2)
+            block_size = (h, w)
         else:
             assert False, "Invalid view '%s'" % view
 
@@ -172,7 +176,7 @@ if __name__ == "__main__":
     parser.add_argument("--texture-size", "-t", type=int, action="append")
     parser.add_argument("--view", "-v", type=str, action="append")
     parser.add_argument("--rotation", "-r", type=int, action="append")
-    parser.add_argument("--assets", "-a", type=str, required=True)
+    parser.add_argument("--assets", "-a", type=str, action="append", required=True)
     parser.add_argument("--blocks", "-b", type=str, action="append")
     parser.add_argument("--output-dir", "-o", type=str, required=True)
 

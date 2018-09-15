@@ -4,6 +4,7 @@ import sys
 import numpy as np
 import math
 import random
+import argparse
 from vispy import app, gloo
 from vispy.util import transforms
 
@@ -122,8 +123,13 @@ class Canvas(app.Canvas):
         render.draw_line(v(0, 0, 0), v(0, 0, 10), actual_model, self.view, self.projection, color=(0, 0, 1, 1))
 
 if __name__ == "__main__":
-    assets = mcmodel.Assets(sys.argv[1])
-    blockstate = assets.get_blockstate(sys.argv[2])
+    parser = argparse.ArgumentParser(description="Generate block images for Mapcrafter.")
+    parser.add_argument("--asset", "-a", type=str, action="append", required=True)
+    parser.add_argument("--block", "-b", type=str)
+    args = parser.parse_args()
+
+    assets = mcmodel.Assets.create(args.asset)
+    blockstate = assets.get_blockstate(args.block)
 
     c = Canvas(blockstate)
     app.run()

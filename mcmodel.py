@@ -32,6 +32,17 @@ def load_blockstate_properties():
     f.close()
     return properties
 
+def create_source(path):
+    if os.path.isdir(path):
+        return DirectorySource(path)
+    elif os.path.isfile(path) and (path.endswith(".zip") or path.endswith(".jar")):
+        return ZipFileSource(path)
+    raise RuntimeError("Unknown asset source! Must be asset directory, Minecraft client jar file, or resource pack zip file.")
+
+def create_builtin_source():
+    custom_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_assets")
+    return create_source(custom_path)
+
 class DirectorySource:
     def __init__(self, path):
         self.path = path
@@ -48,7 +59,7 @@ class DirectorySource:
         f.close()
         return data
 
-class JarFileSource:
+class ZipFileSource:
     def __init__(self, path):
         self.zip = zipfile.ZipFile(path)
 
@@ -95,18 +106,8 @@ class MultipleSources:
         return data
 
 class Assets:
-    def __init__(self, path):
-        source = None
-        if os.path.isdir(path):
-            source = DirectorySource(path)
-        elif os.path.isfile(path) and path.endswith(".jar"):
-            source = JarFileSource(path)
-        else:
-            raise RuntimeError("Unknown asset source! Must be asset directory or Minecraft jar file.")
-
-        # always also include some custom assets
-        custom_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_assets")
-        self.source = MultipleSources([DirectorySource(custom_path), source])
+    def __init__(self, source):
+        self.source = source
 
         self.blockstate_base = "{prefix}/blockstates"
         self.model_base = "{prefix}/models"
@@ -116,6 +117,14 @@ class Assets:
         self._model_cache = {}
 
         self._blockstate_properties = load_blockstate_properties()
+
+    @staticmethod
+    def create(asset_paths):
+        sources = []
+        for path in reversed(asset_paths):
+            sources.append(create_source(path))
+        sources.insert(0, create_builtin_source())
+        return Assets(MultipleSources(sources))
 
     def get_blockstate(self, identifier):
         prefix, name = identifier.split(":")
