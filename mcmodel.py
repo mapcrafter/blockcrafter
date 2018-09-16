@@ -7,12 +7,41 @@ import zipfile
 import fnmatch
 import itertools
 
-# okay, first some termini:
-# modeldef: json structure like blockstates/*.json
-# modelref: json structure of modeldef when a model is referenced
-#               ({"model" : "block/block_blah", "x" : 180})
-# blockdef: json structure like models/*.json
-# variant: a dictionary showing mapping of values to variables
+class BlockstateProperties:
+    def __init__(self):
+        self.rules = []
+    
+    def add(self, wildcard, properties):
+        self.rules.append((wildcard, properties))
+
+    def get(self, blockstate):
+        properties = {}
+        for wildcard, p in self.rules:
+            if fnmatch.fnmatch(blockstate, wildcard):
+                properties.update(p)
+        return properties
+
+    @staticmethod
+    def load(path):
+        properties = BlockstateProperties()
+        f = open(path, "r")
+        for line in f.readlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            parts = line.split(" ")
+            assert len(parts) == 2, "Invalid line '%s'" % line
+
+            name = parts[0]
+            p = parse_variant(parts[1])
+            properties.add(name, p)
+        f.close()
+        return properties
+
+    @staticmethod
+    def load_default():
+        path = os.path.join(os.path.abspath(os.path.dirname(__file__)), "blockstates.properties")       
+        return BlockstateProperties.load(path)
 
 def load_blockstate_properties():
     properties = {}
@@ -116,7 +145,7 @@ class Assets:
         self._model_json_cache = {}
         self._model_cache = {}
 
-        self._blockstate_properties = load_blockstate_properties()
+        self._blockstate_properties = BlockstateProperties.load_default()
 
     @staticmethod
     def create(asset_paths):
@@ -129,7 +158,7 @@ class Assets:
     def get_blockstate(self, identifier):
         prefix, name = identifier.split(":")
         path = os.path.join(self.blockstate_base.format(prefix=prefix), name + ".json")
-        properties = self._blockstate_properties.get(identifier, {})
+        properties = self._blockstate_properties.get(identifier)
         return Blockstate(self, prefix, name, json.loads(self.source.load_file(path)), properties=properties)
 
     @property
