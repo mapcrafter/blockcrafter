@@ -374,11 +374,13 @@ class Element:
 
         faces = {}
         for direction, facedef in element["faces"].items():
+            # TODO, cache loaded and processed textures!
             f = model.load_texture(facedef["texture"])
             if f is None:
                 raise RuntimeError("Face in direction '%s' has no texture associated" % direction)
             uvs = np.array(facedef.get("uv", [0, 0, 16, 16]), dtype=np.float32) / 16.0
             uv0, uv1 = uvs[:2], uvs[2:]
+
             image = Image.open(f).convert("RGBA")
             if image.size[0] != image.size[1]:
                 assert(image.size[0] < image.size[1])
@@ -386,13 +388,21 @@ class Element:
                 image = image.crop((0, 0, s, s))
             if "rotation" in facedef:
                 image = image.rotate(-facedef["rotation"])
+
             data = np.array(image)
+            semi_transparent = np.all((data[:, :, 3] == 0) | (data[:, :, 3] == 255))
+            s = image.size[0] * 2
+            image = image.resize((s, s), resample=Image.BILINEAR)
+            data = np.array(image)
+
+            if semi_transparent:
+                data[:, :, 3] = (data[:, :, 3] > 255/2.0) * 255
             if "blockcrafterTint" in facedef:
                 r, g, b = facedef["blockcrafterTint"]
                 data[:, :, 0] = data[:, :, 0] * r
                 data[:, :, 1] = data[:, :, 1] * g
                 data[:, :, 2] = data[:, :, 2] * b
-            faces[direction] = (gloo.Texture2D(data=data), (uv0, uv1))
+            faces[direction] = (gloo.Texture2D(data=data, interpolation="nearest"), (uv0, uv1))
             f.close()
 
         # gather faces in order for cube sides
