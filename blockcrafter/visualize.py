@@ -1,4 +1,19 @@
-#!/usr/bin/env python
+# Copyright 2018 Moritz Hilscher
+#
+# This file is part of Blockcrafter.
+#
+# Blockcrafter is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# Blockcrafter is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with Blockcrafter.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
 import numpy as np
@@ -8,8 +23,8 @@ import argparse
 from vispy import app, gloo
 from vispy.util import transforms
 
-import mcmodel
-import render
+from blockcrafter import mcmodel
+from blockcrafter import render
 
 views = ["perspective", "isometric", "topdown"]
 rotations = ["top-left", "top-right", "bottom-right", "bottom-left"]
@@ -122,7 +137,7 @@ class Canvas(app.Canvas):
         render.draw_line(v(0, 0, 0), v(0, 10, 0), actual_model, self.view, self.projection, color=(0, 1, 0, 1))
         render.draw_line(v(0, 0, 0), v(0, 0, 10), actual_model, self.view, self.projection, color=(0, 0, 1, 1))
 
-if __name__ == "__main__":
+def main():
     parser = argparse.ArgumentParser(description="Generate block images for Mapcrafter.")
     parser.add_argument("--asset", "-a", type=str, action="append", required=True)
     parser.add_argument("--block", "-b", type=str)
