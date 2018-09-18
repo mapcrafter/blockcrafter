@@ -1,15 +1,19 @@
-#FROM python:3-slim-stretch
 FROM python:3-alpine
 
-#RUN apt-get update && apt-get install -y libgl1-mesa-glx libosmesa-dev && rm -rf /var/lib/apt/lists/*
-
-RUN apk --no-cache add mesa-osmesa mesa-gles gcc gfortran python-dev build-base wget freetype-dev fontconfig-dev libpng-dev libjpeg-turbo-dev openblas-dev && \
-    pip --no-cache-dir install vispy Pillow && \
-    apk del python-dev gcc openblas-dev gfortran build-base wget && apk --no-cache add openblas binutils && rm -rf /var/cache/apk/*
+RUN apk --no-cache add git mesa-osmesa mesa-gles gcc gfortran python-dev build-base wget freetype-dev fontconfig-dev libpng-dev libjpeg-turbo-dev openblas-dev && pip install numpy vispy Pillow
 
 COPY . /blockcrafter
+RUN cd /blockcrafter && pip wheel .
+
+
+FROM python:3-alpine
+
+RUN apk --no-cache add mesa-osmesa mesa-gles libpng freetype fontconfig-dev libjpeg-turbo openblas binutils
+
+COPY --from=0 /blockcrafter/*.whl /blockcrafter/
+RUN rm /blockcrafter/*manylinux1*.whl && pip install /blockcrafter/*.whl
 
 ENV VISPY_GL_LIB /usr/lib/libGLESv2.so.2
 ENV OSMESA_LIBRARY /usr/lib/libOSMesa.so.8
 
-ENTRYPOINT ["/blockcrafter/export.py"]
+ENTRYPOINT ["/usr/local/bin/blockcrafter-export", "--osmesa"]
