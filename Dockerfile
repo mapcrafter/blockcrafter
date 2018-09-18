@@ -8,12 +8,14 @@ RUN cd /blockcrafter && pip wheel .
 
 FROM python:3-alpine
 
-RUN apk --no-cache add mesa-osmesa mesa-gles libpng freetype fontconfig-dev libjpeg-turbo openblas binutils
+RUN apk --no-cache add mesa-osmesa mesa-gles libpng freetype fontconfig-dev libjpeg-turbo openblas binutils shadow
 
 COPY --from=0 /blockcrafter/*.whl /blockcrafter/
 RUN rm -f /blockcrafter/*manylinux1*.whl && pip install /blockcrafter/*.whl
 
+COPY entrypoint.sh /
+
 ENV VISPY_GL_LIB /usr/lib/libGLESv2.so.2
 ENV OSMESA_LIBRARY /usr/lib/libOSMesa.so.8
 
-ENTRYPOINT ["/usr/local/bin/blockcrafter-export", "--osmesa"]
+ENTRYPOINT ["/entrypoint.sh"]
