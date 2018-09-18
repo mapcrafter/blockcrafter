@@ -11,7 +11,7 @@ FROM python:3-alpine
 RUN apk --no-cache add mesa-osmesa mesa-gles libpng freetype fontconfig-dev libjpeg-turbo openblas binutils
 
 COPY --from=0 /blockcrafter/*.whl /blockcrafter/
-RUN rm /blockcrafter/*manylinux1*.whl && pip install /blockcrafter/*.whl
+RUN rm -f /blockcrafter/*manylinux1*.whl && pip install /blockcrafter/*.whl
 
 ENV VISPY_GL_LIB /usr/lib/libGLESv2.so.2
 ENV OSMESA_LIBRARY /usr/lib/libOSMesa.so.8
