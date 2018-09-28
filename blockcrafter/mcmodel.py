@@ -255,18 +255,21 @@ class Blockstate:
         self.waterloggable = properties.get("is_waterloggable", "") == "true"
         self.inherently_waterlogged = properties.get("inherently_waterlogged", "") == "true"
 
-        if "biome_colormap" in properties:
-            colormap = properties["biome_colormap"]
-            flipped = False
-            if colormap.endswith("_flipped"):
-                flipped = True
-                colormap = colormap.replace("_flipped", "")
+        if "biome_colormap" in self.extra_properties:
+            def load_colormap(colormap):
+                flipped = False
+                if colormap.endswith("_flipped"):
+                    flipped = True
+                    colormap = colormap.replace("_flipped", "")
 
-            image = Image.open(self.assets.load_texture(self.prefix, "colormap/" + colormap + ".png"))
-            image = image.convert("RGBA")
-            colors = util.extract_colormap_colors(image)
-            colors = util.encode_colormap_colors(colors)
-            properties["biome_colormap"] = colors
+                image = Image.open(self.assets.load_texture(self.prefix, "colormap/" + colormap + ".png"))
+                image = image.convert("RGBA")
+                colors = util.extract_colormap_colors(image)
+                return util.encode_colormap_colors(colors)
+
+            colormap = self.extra_properties["biome_colormap"]
+            if not "|" in colormap:
+                self.extra_properties["biome_colormap"] = load_colormap(colormap)
 
         self.properties = self._get_properties()
         if self.waterloggable:
