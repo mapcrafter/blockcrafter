@@ -392,15 +392,16 @@ class Element:
         faces = {}
         for direction, facedef in element["faces"].items():
             # TODO, cache loaded and processed textures!
-            f = model.load_texture(facedef["texture"])
-            if f is None:
+            texture_name = model.resolve_texture(facedef["texture"])
+            if texture_name is None:
                 raise RuntimeError("Face in direction '%s' has no texture associated" % direction)
+            f = model.load_texture(texture_name)
             uvs = np.array(facedef.get("uv", [0, 0, 16, 16]), dtype=np.float32) / 16.0
             uv0, uv1 = uvs[:2], uvs[2:]
 
             image = Image.open(f).convert("RGBA")
-            if image.size[0] != image.size[1]:
-                assert(image.size[0] < image.size[1])
+            if texture_name.startswith("block/") and image.size[0] != image.size[1]:
+                assert image.size[0] < image.size[1]
                 s = image.size[0]
                 image = image.crop((0, 0, s, s))
             if "rotation" in facedef:
@@ -408,12 +409,12 @@ class Element:
 
             data = np.array(image)
             semi_transparent = np.all((data[:, :, 3] == 0) | (data[:, :, 3] == 255))
-            s = image.size[0] * 2
-            image = image.resize((s, s), resample=Image.BILINEAR)
+            w, h = image.size
+            image = image.resize((w*2, h*2), resample=Image.BILINEAR)
             data = np.array(image)
-
             if semi_transparent:
                 data[:, :, 3] = (data[:, :, 3] > 255/2.0) * 255
+
             if "blockcrafterTint" in facedef:
                 r, g, b = facedef["blockcrafterTint"]
                 data[:, :, 0] = data[:, :, 0] * r
@@ -443,6 +444,8 @@ class Model:
             m = np.dot(m, transforms.rotate(-modelref["x"], (1, 0, 0)))
         if "y" in modelref:
             m = np.dot(m, transforms.rotate(-modelref["y"], (0, 1, 0)))
+        if "z" in modelref:
+            m = np.dot(m, transforms.rotate(-modelref["z"], (0, 0, 1)))
 
         uvlock = modelref.get("uvlock", False)
         for element in self.elements:

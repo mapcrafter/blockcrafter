@@ -1,0 +1,11 @@
+{
+    "parent" : "block/base_chest_single",
+    "textures": {
+        "front": "entity/chest/trapped/front",
+        "side": "entity/chest/trapped/side",
+        "top": "entity/chest/trapped/top",
+        "thing_front": "entity/chest/trapped/thing_front",
+        "thing_side": "entity/chest/trapped/thing_side",
+        "thing_top": "entity/chest/trapped/thing_top"
+    }
+}

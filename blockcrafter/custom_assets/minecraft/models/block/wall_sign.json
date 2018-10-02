@@ -1,0 +1,23 @@
+{
+    "textures": {
+        "post": "entity/sign/post",
+        "front": "entity/sign/front",
+        "back" : "entity/sign/back",
+        "side": "entity/sign/side",
+        "top": "entity/sign/top"
+    },
+    "elements": [
+        {
+            "comment" : "sign",
+            "from": [ 0, 4, 0 ],
+            "to": [ 16, 12, 2 ],
+            "faces": {
+                "up" :  { "texture": "#top" },
+                "north":  { "texture": "#back" },
+                "south":  { "texture": "#front" },
+                "east":  { "texture": "#side" },
+                "west":  { "texture": "#side" }
+            }
+        }
+    ]
+}

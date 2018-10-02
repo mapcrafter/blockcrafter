@@ -1,0 +1,12 @@
+{
+    "parent" : "block/base_chest_left",
+    "textures": {
+        "front": "entity/chest/normal_double/left_front",
+        "side": "entity/chest/normal_double/side",
+        "right_back": "entity/chest/normal_double/right_back",
+        "top": "entity/chest/normal_double/left_top",
+        "thing_front": "entity/chest/normal_double/thing_front",
+        "thing_side": "entity/chest/normal_double/thing_side",
+        "thing_top": "entity/chest/normal_double/thing_top"
+    }
+}

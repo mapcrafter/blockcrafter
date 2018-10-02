@@ -1,0 +1,17 @@
+{
+    "elements": [
+        {
+            "comment" : "shulker box",
+            "from": [ 0, 0, 0 ],
+            "to": [ 16, 16, 16 ],
+            "faces": {
+                "up" : { "texture": "#top" },
+                "down" : { "texture": "#top" },
+                "north":  { "texture": "#side" },
+                "south":  { "texture": "#side" },
+                "east":  { "texture": "#side" },
+                "west":  { "texture": "#side" }
+            }
+        }
+    ]
+}

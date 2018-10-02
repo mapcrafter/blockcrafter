@@ -1,0 +1,27 @@
+{
+    "elements": [
+        {
+            "comment" : "chest",
+            "from": [ 0, 0, 1 ],
+            "to": [ 15, 14, 15 ],
+            "faces": {
+                "up" : { "texture": "#top" },
+                "north":  { "texture": "#left_back" },
+                "south":  { "texture": "#front" },
+                "east":  { "texture": "#side" }
+            }
+        },
+        {
+            "comment" : "thingy",
+            "from": [ -1, 7, 15 ],
+            "to": [ 1, 11, 16 ],
+            "faces": {
+                "up" : { "texture": "#thing_top" },
+                "north":  { "texture": "#thing_side" },
+                "south":  { "texture": "#thing_front" },
+                "east":  { "texture": "#thing_side" },
+                "west":  { "texture": "#thing_side" }
+            }
+        }
+    ]
+}

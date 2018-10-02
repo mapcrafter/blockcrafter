@@ -16,6 +16,7 @@
 # along with Blockcrafter.  If not, see <http://www.gnu.org/licenses/>.
 
 import os
+import io
 import glob
 import json
 import zipfile
@@ -152,6 +153,148 @@ class MultipleSources:
         f.close()
         return data
 
+def pack_image(image):
+    f = io.BytesIO()
+    image.save(f, "png")
+    return f.getvalue()
+
+# entity textures are often packed together in one texture
+# e.g. minecraft/textures/entity/*
+# for blockcrafter to be able to use entity textures in custom model files
+#          (Minecraft doesn't provide these, we have to build them on our own)
+# we have to take these composed texture files apart to single images
+# and somehow have them available just like the other block textures
+# that's what this class does for a given source
+class EntityTextureSource:
+    def __init__(self, source):
+        self.files = self.create_files(source)
+        #for path, data in self.files.items():
+        #    print(path)
+            #os.makedirs(os.path.dirname("test/" + path), exist_ok=True)
+            #f = open("test/" + path, "wb")
+            #f.write(data)
+            #f.close()
+
+    def create_chest_files(self, source, path):
+        base_name = path.replace(".png", "/")
+        if len(source.glob_files(path)) == 0:
+            return {}
+        image = Image.open(source.open_file(path)).convert("RGBA")
+        w, h = image.size
+        assert w == h
+        f = w / 64
+
+        front = image.crop((int(f * 14), int(f * 14), int(f * 28), int(f * 28)))
+        front.paste(image.crop((int(f * 14), int(f * 33), int(f * 28), int(f * (33+14)))), (int(f * 0), int(f * 5)))
+        side = image.crop((int(f * 0), int(f * 14), int(f * 14), int(f * 28)))
+        side.paste(image.crop((int(f * 0), int(f * 33), int(f * 14), int(f * (33+14)))), (int(f * 0), int(f * 5)))
+
+        files = {}
+        files[base_name + "front.png"] = pack_image(front)
+        files[base_name + "side.png"] = pack_image(side)
+        files[base_name + "top.png"] = pack_image(image.crop((int(f * 14), int(f * 0), int(f * 28), int(f * 14))))
+        files[base_name + "thing_front.png"] = pack_image(image.crop((int(f * 1), int(f * 1), int(f * 3), int(f * 5))))
+        files[base_name + "thing_side.png"] = pack_image(image.crop((int(f * 0), int(f * 1), int(f * 1), int(f * 5))))
+        files[base_name + "thing_top.png"] = pack_image(image.crop((int(f * 1), int(f * 0), int(f * 3), int(f * 1))))
+
+        return files
+
+    def create_double_chest_files(self, source, path):
+        base_name = path.replace(".png", "/")
+        if len(source.glob_files(path)) == 0:
+            return {}
+        image = Image.open(source.open_file(path)).convert("RGBA")
+        w, h = image.size
+        assert w == h * 2
+        f = w / 128
+
+        left_front = image.crop((int(f * 14), int(f * 14), int(f * 29), int(f * 28)))
+        left_front.paste(image.crop((int(f * 14), int(f * 33), int(f * 29), int(f * (33+14)))), (int(f * 0), int(f * 5)))
+        right_front = image.crop((int(f * 29), int(f * 14), int(f * 44), int(f * 28)))
+        right_front.paste(image.crop((int(f * 29), int(f * 33), int(f * 44), int(f * (33+14)))), (int(f * 0), int(f * 5)))
+        side = image.crop((int(f * 0), int(f * 14), int(f * 14), int(f * 28)))
+        side.paste(image.crop((int(f * 0), int(f * 33), int(f * 14), int(f * (33+14)))), (int(f * 0), int(f * 5)))
+        left_back = image.crop((int(f * 58), int(f * 14), int(f * 73), int(f * 28)))
+        left_back.paste(image.crop((int(f * 58), int(f * 33), int(f * 73), int(f * (33+14)))), (int(f * 0), int(f * 5)))
+        right_back = image.crop((int(f * 73), int(f * 14), int(f * 88), int(f * 28)))
+        right_back.paste(image.crop((int(f * 73), int(f * 33), int(f * 88), int(f * (33+14)))), (int(f * 0), int(f * 5)))
+
+        files = {}
+        files[base_name + "left_front.png"] = pack_image(left_front)
+        files[base_name + "right_front.png"] = pack_image(right_front)
+        files[base_name + "side.png"] = pack_image(side)
+        files[base_name + "left_back.png"] = pack_image(left_back)
+        files[base_name + "right_back.png"] = pack_image(right_back)
+        files[base_name + "left_top.png"] = pack_image(image.crop((int(f * 14), int(f * 0), int(f * 29), int(f * 14))))
+        files[base_name + "right_top.png"] = pack_image(image.crop((int(f * 29), int(f * 0), int(f * 44), int(f * 14))))
+        files[base_name + "thing_front.png"] = pack_image(image.crop((int(f * 1), int(f * 1), int(f * 3), int(f * 5))))
+        files[base_name + "thing_side.png"] = pack_image(image.crop((int(f * 0), int(f * 1), int(f * 1), int(f * 5))))
+        files[base_name + "thing_top.png"] = pack_image(image.crop((int(f * 1), int(f * 0), int(f * 3), int(f * 1))))
+        return files
+
+    def create_sign_files(self, source, path):
+        base_name = path.replace(".png", "/")
+        if len(source.glob_files(path)) == 0:
+            return {}
+        image = Image.open(source.open_file(path)).convert("RGBA")
+        w, h = image.size
+        assert w == h * 2
+        f = w / 64
+
+        files = {}
+        files[base_name + "front.png"] = pack_image(image.crop((int(f * 2), int(f * 2), int(f * 24), int(f * 14))))
+        files[base_name + "back.png"] = pack_image(image.crop((int(f * 24), int(f * 2), int(f * 46), int(f * 14))))
+        files[base_name + "top.png"] = pack_image(image.crop((int(f * 2), int(f * 0), int(f * 24), int(f * 2))))
+        files[base_name + "side.png"] = pack_image(image.crop((int(f * 0), int(f * 2), int(f * 2), int(f * 14))))
+        files[base_name + "post.png"] = pack_image(image.crop((int(f * 2), int(f * 16), int(f * 4), int(f * 30))))
+        return files
+
+    def create_shulker_files(self, source, path):
+        base_name = path.replace(".png", "/")
+        if len(source.glob_files(path)) == 0:
+            return {}
+        image = Image.open(source.open_file(path)).convert("RGBA")
+        w, h = image.size
+        assert w == h
+        f = w / 64
+
+        side = image.crop((int(f * 0), int(f * 36), int(f * 16), int(f * 52)))
+        part = image.crop((int(f * 0), int(f * 16), int(f * 16), int(f * 28)))
+        side.paste(part, (0, 0), part)
+
+        files = {}
+        files[base_name + "side.png"] = pack_image(side)
+        files[base_name + "top.png"] = pack_image(image.crop((int(f * 16), int(f * 0), int(f * 32), int(f * 16))))
+        return files
+
+    def create_files(self, source):
+        files = {}
+        files.update(self.create_chest_files(source, "minecraft/textures/entity/chest/normal.png"))
+        files.update(self.create_chest_files(source, "minecraft/textures/entity/chest/trapped.png"))
+        files.update(self.create_chest_files(source, "minecraft/textures/entity/chest/ender.png"))
+        files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/normal_double.png"))
+        files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/trapped_double.png"))
+        files.update(self.create_sign_files(source, "minecraft/textures/entity/sign.png"))
+        for path in source.glob_files("minecraft/textures/entity/shulker/shulker*.png"):
+            files.update(self.create_shulker_files(source, path))
+        return files
+
+    def glob_files(self, wildcard):
+        files = []
+        for path in self.files.keys():
+            if fnmatch.fnmatch(path, wildcard):
+                files.append(path)
+        return sorted(files)
+
+    def open_file(self, path, mode="r"):
+        return io.BytesIO(self.files[path])
+
+    def load_file(self, path):
+        f = self.open_file(path)
+        data = f.read()
+        f.close()
+        return data
+
 class Assets:
     def __init__(self, source):
         self.source = source
@@ -169,7 +312,9 @@ class Assets:
     def create(asset_paths):
         sources = []
         for path in reversed(asset_paths):
-            sources.append(create_source(path))
+            source = create_source(path)
+            sources.append(source)
+            sources.append(EntityTextureSource(source))
         sources.insert(0, create_builtin_source())
         return Assets(MultipleSources(sources))
 
@@ -388,14 +533,16 @@ class Model:
     def elements(self):
         return self.data["elements"]
 
-    def load_texture(self, texture):
+    def resolve_texture(self, texture):
         if not texture.startswith("#"):
-            return self.assets.load_texture(self.prefix, texture + ".png")
-            #return os.path.join(TEXTURE_BASE, texture + ".png")
+            return texture
         name = texture[1:]
         if not name in self.textures:
             return None
-        return self.load_texture(self.textures[name])
+        return self.resolve_texture(self.textures[name])
+
+    def load_texture(self, name):
+        return self.assets.load_texture(self.prefix, name + ".png")
 
     def __repr__(self):
         return "<Model name=%s>" % self.name

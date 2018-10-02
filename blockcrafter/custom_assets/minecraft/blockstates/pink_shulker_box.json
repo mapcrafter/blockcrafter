@@ -1,0 +1,10 @@
+{
+    "variants": {
+        "facing=north" : { "model" : "block/pink_shulker_box", "x": 90 },
+        "facing=south" : { "model" : "block/pink_shulker_box", "x": 270 },
+        "facing=east" : { "model" : "block/pink_shulker_box", "z": 90 },
+        "facing=west" : { "model" : "block/pink_shulker_box", "z": 270 },
+        "facing=up" : { "model" : "block/pink_shulker_box" },
+        "facing=down" : { "model" : "block/pink_shulker_box", "x" : 180 }
+    }
+    }
