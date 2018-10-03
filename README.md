@@ -34,7 +34,7 @@ With docker, you have to run:
 
 ### Example ###
 
-You need to get a Minecraft client jar file of version 1.13 at least. Then you can run `blockcrafter-export` (or the equivalent docker command):
+You need to get a Minecraft client jar file of at least version 1.13. Then you can run `blockcrafter-export` (or the equivalent docker command):
 
 `blockcrafter-export -a 1.13.1.jar -o blocks -v isometric -t 12 -r 0`
 
