@@ -38,7 +38,7 @@ You need to get a Minecraft client jar file of version 1.13 at least. Then you c
 
 `blockcrafter-export -a 1.13.1.jar -o blocks -v isometric -t 12 -r 0`
 
-This makes Blockcrafter export the Minecraft 1.13.1 block images of isometric render view with texture size 12px and rotation 0 (top-left) to the directory `blocks/`. You can also export block images of multiple render views / texture sizes / rotations by just passing multiple `-v`/`-t`/`-r` arguments. Blockcrafter will then export block images for all configurations render views `x` texture sizes `x` rotations. See below for a reference of all options.
+This makes Blockcrafter export the Minecraft 1.13.1 block images of isometric render view with texture size 12px and rotation 0 (top-left) to the directory `blocks/`. You can also export block images of multiple render views / texture sizes / rotations by just passing multiple `-v`/`-t`/`-r` arguments. Blockcrafter will then export block images for all configurations `render views x texture sizes x rotations`. See below for a reference of all options.
 
 ### Command line options ###
 
