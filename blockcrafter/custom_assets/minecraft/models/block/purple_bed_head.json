@@ -1,0 +1,13 @@
+{
+    "parent": "block/base_bed_head",
+    "textures": {
+        "head_top": "entity/bed/purple/head_top",
+        "head_front": "entity/bed/purple/head_front",
+        "head_side": "entity/bed/purple/head_side",
+        "foot_top": "entity/bed/purple/foot_top",
+        "foot_front": "entity/bed/purple/foot_front",
+        "foot_side": "entity/bed/purple/foot_side",
+        "stand_outer": "entity/bed/purple/stand_outer",
+        "stand_inner": "entity/bed/purple/stand_inner"
+    }
+    }

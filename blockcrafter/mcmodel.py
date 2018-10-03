@@ -267,6 +267,26 @@ class EntityTextureSource:
         files[base_name + "top.png"] = pack_image(image.crop((int(f * 16), int(f * 0), int(f * 32), int(f * 16))))
         return files
 
+    def create_bed_files(self, source, path):
+        base_name = path.replace(".png", "/")
+        if len(source.glob_files(path)) == 0:
+            return {}
+        image = Image.open(source.open_file(path)).convert("RGBA")
+        w, h = image.size
+        assert w == h
+        f = w / 64
+
+        files = {}
+        files[base_name + "head_top.png"] = pack_image(image.crop((int(f * 6), int(f * 6), int(f * 22), int(f * 22))))
+        files[base_name + "head_front.png"] = pack_image(image.crop((int(f * 6), int(f * 0), int(f * 22), int(f * 6))).transpose(Image.ROTATE_180))
+        files[base_name + "head_side.png"] = pack_image(image.crop((int(f * 0), int(f * 6), int(f * 6), int(f * 22))).transpose(Image.ROTATE_90))
+        files[base_name + "foot_top.png"] = pack_image(image.crop((int(f * 6), int(f * 28), int(f * 22), int(f * 44))))
+        files[base_name + "foot_front.png"] = pack_image(image.crop((int(f * 22), int(f * 22), int(f * 38), int(f * 28))).transpose(Image.ROTATE_180))
+        files[base_name + "foot_side.png"] = pack_image(image.crop((int(f * 0), int(f * 28), int(f * 6), int(f * 44))).transpose(Image.ROTATE_90))
+        files[base_name + "stand_outer.png"] = pack_image(image.crop((int(f * 50), int(f * 3), int(f * 53), int(f * 6))))
+        files[base_name + "stand_inner.png"] = pack_image(image.crop((int(f * 56), int(f * 3), int(f * 59), int(f * 6))))
+        return files
+
     def create_files(self, source):
         files = {}
         files.update(self.create_chest_files(source, "minecraft/textures/entity/chest/normal.png"))
@@ -277,6 +297,8 @@ class EntityTextureSource:
         files.update(self.create_sign_files(source, "minecraft/textures/entity/sign.png"))
         for path in source.glob_files("minecraft/textures/entity/shulker/shulker*.png"):
             files.update(self.create_shulker_files(source, path))
+        for path in source.glob_files("minecraft/textures/entity/bed/*.png"):
+            files.update(self.create_bed_files(source, path))
         return files
 
     def glob_files(self, wildcard):

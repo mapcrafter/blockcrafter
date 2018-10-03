@@ -1,0 +1,13 @@
+{
+    "parent": "block/base_bed_foot",
+    "textures": {
+        "head_top": "entity/bed/green/head_top",
+        "head_front": "entity/bed/green/head_front",
+        "head_side": "entity/bed/green/head_side",
+        "foot_top": "entity/bed/green/foot_top",
+        "foot_front": "entity/bed/green/foot_front",
+        "foot_side": "entity/bed/green/foot_side",
+        "stand_outer": "entity/bed/green/stand_outer",
+        "stand_inner": "entity/bed/green/stand_inner"
+    }
+    }

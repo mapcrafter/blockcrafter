@@ -1,0 +1,37 @@
+{
+    "elements": [
+        {
+            "comment": "stand south-west",
+            "from": [0, 0, 13],
+            "to": [3, 3, 16],
+            "faces": {
+                "north": { "texture": "#stand_inner", "uv": [16, 0, 0, 16] },
+                "south": { "texture": "#stand_outer", "uv": [16, 0, 0, 16] },
+                "east": { "texture": "#stand_inner" },
+                "west": { "texture": "#stand_outer" }
+            }
+        },
+        {
+            "comment": "stand south-east",
+            "from": [13, 0, 13],
+            "to": [16, 3, 16],
+            "faces": {
+                "north": { "texture": "#stand_inner" },
+                "south": { "texture": "#stand_outer" },
+                "east": { "texture": "#stand_outer", "uv": [16, 0, 0, 16] },
+                "west": { "texture": "#stand_inner", "uv": [16, 0, 0, 16] }
+            }
+        },
+        {
+            "comment": "bed",
+            "from": [0, 3, 0],
+            "to": [16, 9, 16],
+            "faces": {
+                "up": { "texture": "#foot_top" },
+                "south": { "texture": "#foot_front" },
+                "east": { "texture": "#foot_side", "uv": [16, 0, 0, 16] },
+                "west": { "texture": "#foot_side" }
+            }
+        }
+    ]
+}
