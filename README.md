@@ -46,7 +46,7 @@ This makes Blockcrafter export the Minecraft 1.13.1 block images of isometric re
 
 `-a <asset>, --asset=<asset>` **required**: Input Minecraft asset. Can be path to Minecraft client jar, to a resource pack zip, or to a directory of any of these unpacked. If you want to use a custom texture pack, it's important that you pass the Minecraft assets first and then the texture pack, for example `-a 1.13.1.jar -a texturepack.zip`.
 
-`-o <directory>, --output-dir=<directory>` **required**: Output directory where Blockcrafter should export block images to. 
+`-o <directory>, --output-dir=<directory>` **required**: Output directory where Blockcrafter should export block images to. This is where you want to point Mapcrafter to with the map option `block_dir`.
 
 `-v <view>, --view=<view>`: Render view to export block images for, must be one of `isometric`, `topdown`, or `side`. You can use this option multiple times to export block images for multiple views, for example `-v isometric -v topdown`. If you don't specify this option, block images are exported for all views.
 
