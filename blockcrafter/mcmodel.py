@@ -439,8 +439,6 @@ class Blockstate:
                 self.extra_properties["biome_colormap"] = load_colormap(colormap)
 
         self.properties = self._get_properties()
-        if self.waterloggable:
-            self.properties["waterlogged"] = ["true", "false"]
         self.variants = self._get_variants(self.properties)
     
     def evaluate_variant(self, variant):
@@ -531,9 +529,6 @@ class Blockstate:
         variants = []
         for product in sorted(itertools.product(*values)):
             variant = dict(list(zip(keys, product)))
-            if self.waterloggable and self.inherently_waterlogged:
-                if variant["waterlogged"] == "true":
-                    del variant["waterlogged"]
             variants.append(variant)
         return variants
 

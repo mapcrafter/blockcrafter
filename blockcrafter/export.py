@@ -147,18 +147,30 @@ class Canvas(app.Canvas):
                     image = Image.fromarray(array)
                     index = images.append(image)
                     indices.append(index)
-                
-                write_block_info(blockstate, variant, indices)
-                if blockstate.waterloggable and variant.get("waterlogged", "") == "false":
+
+                # waterlogged blocks need several variants written out
+                if blockstate.waterloggable:
                     variant = dict(variant)
-                    variant["was_waterlogged"] = "true"
+                    # 1. waterlogged version (will get water on top)
+                    # (some blocks are always waterlogged, they don't have the waterlogged property)
+                    if not blockstate.inherently_waterlogged:
+                        variant["waterlogged"] = "true"
                     write_block_info(blockstate, variant, indices)
 
-                #name = blockstate.prefix + ":" + blockstate.name
-                #properties = dict(blockstate.extra_properties)
-                #properties["color"] = str(indices[0])
-                #properties["uv"] = str(indices[1])
-                #print("%s %s %s" % (name, mcmodel.encode_variant(variant), mcmodel.encode_variant(properties)), file=finfo)
+                    # 2. non-waterlogged version
+                    # (only blocks that are not always waterlogged need this)
+                    if not blockstate.inherently_waterlogged:
+                        variant["waterlogged"] = "false"
+                        write_block_info(blockstate, variant, indices)
+
+                    # 3. blocks that are waterlogged in Minecraft but don't get the water on top in Mapcrafter
+                    # (because there is water on top already, Mapcrafter needs this extra state internally)
+                    variant["was_waterlogged"] = "true"
+                    variant["waterlogged"] = "false"
+                    write_block_info(blockstate, variant, indices)
+                else:
+                    # normal blocks just get their info written out
+                    write_block_info(blockstate, variant, indices)
 
         if not self.args.no_render:
             images.export(columns=COLUMNS).save(image_path)
