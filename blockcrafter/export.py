@@ -191,7 +191,7 @@ class Canvas(app.Canvas):
 
             info_path = os.path.join(self.args.output_dir, name + ".txt")
             image_path = os.path.join(self.args.output_dir, name + ".png")
-            print(image_path)
+            print(image_path, flush=True)
             self.render_blocks(blockstates, texture_size, view, rotation, info_path, image_path)
 
         self.close()
