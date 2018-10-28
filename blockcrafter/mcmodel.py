@@ -96,10 +96,11 @@ class DirectorySource:
         self.path = path
 
     def glob_files(self, wildcard):
-        return sorted([ os.path.relpath(p, self.path) for p in glob.glob(os.path.join(self.path, wildcard)) ])
+        # relpath() changes '/' to '\' on Windows, but we needs everything to be consistent "/".
+        return sorted([ os.path.relpath(p, self.path).replace("\\", "/") for p in glob.glob(self.path + "/" + wildcard) ])
 
     def open_file(self, path, mode="r"):
-        return open(os.path.join(self.path, path), mode)
+        return open(self.path + "/" + path, mode)
 
     def load_file(self, path):
         f = self.open_file(path)
@@ -116,7 +117,8 @@ class ZipFileSource:
         files = []
         for path in self.zip.namelist():
             if fnmatch.fnmatch(path, wildcard):
-                files.append(os.path.relpath(path, "assets"))
+                # relpath() changes '/' to '\' on Windows, but zipfile needs everything to be consistent.
+                files.append(os.path.relpath(path, "assets").replace("\\", "/"))
         return sorted(files)
 
     def open_file(self, path, mode="r"):
@@ -342,13 +344,13 @@ class Assets:
 
     def get_blockstate(self, identifier):
         prefix, name = identifier.split(":")
-        path = os.path.join(self.blockstate_base.format(prefix=prefix), name + ".json")
+        path = self.blockstate_base.format(prefix=prefix) + "/" + name + ".json"
         properties = self._blockstate_properties.get(identifier)
         return Blockstate(self, prefix, name, json.loads(self.source.load_file(path)), properties=properties)
 
     @property
     def blockstate_files(self):
-        return self.source.glob_files(os.path.join(self.blockstate_base.format(prefix="*"), "*.json"))
+        return self.source.glob_files(self.blockstate_base.format(prefix="*") + "/*.json")
 
     @property
     def blockstates(self):
@@ -372,7 +374,7 @@ class Assets:
 
         if "parent" in m:
             prefix = path.split("/")[0]
-            parent = self._get_model_json(os.path.join(self.model_base.format(prefix=prefix), m["parent"] + ".json"))
+            parent = self._get_model_json(self.model_base.format(prefix=prefix) + "/" + m["parent"] + ".json")
             textures.update(parent["textures"])
             if "elements" in parent:
                 elements = parent["elements"]
@@ -399,7 +401,7 @@ class Assets:
 
     @property
     def model_files(self):
-        return self.source.glob_files(os.path.join(self.model_base.format(prefix="*"), "block", "*.json"))
+        return self.source.glob_files(self.model_base.format(prefix="*") + "/block*.json")
 
     @property
     def models(self):
@@ -409,7 +411,7 @@ class Assets:
         return models
 
     def load_texture(self, prefix, path):
-        return self.source.open_file(os.path.join(self.texture_base.format(prefix=prefix), path), mode="rb")
+        return self.source.open_file(self.texture_base.format(prefix=prefix) + "/" + path, mode="rb")
 
 class Blockstate:
     def __init__(self, assets, prefix, name, data, properties={}):
@@ -472,7 +474,7 @@ class Blockstate:
             model_name = modelref["model"]
             model_transformation = dict(modelref)
             del model_transformation["model"]
-            model = self.assets.get_model(os.path.join(self.prefix + "/models", model_name + ".json"))
+            model = self.assets.get_model(self.prefix + "/models/" + model_name + ".json")
             evaluated.append((model, model_transformation))
         return evaluated
 
