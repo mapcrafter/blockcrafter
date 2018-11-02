@@ -346,7 +346,11 @@ class Assets:
         prefix, name = identifier.split(":")
         path = self.blockstate_base.format(prefix=prefix) + "/" + name + ".json"
         properties = self._blockstate_properties.get(identifier)
-        return Blockstate(self, prefix, name, json.loads(self.source.load_file(path)), properties=properties)
+        ### EDIT (Pull request from Berghopper)
+        json_loads_obj = self.source.load_file(path)
+        if isinstance(json_loads_obj, bytes):
+            json_loads_obj = json_loads_obj.decode("utf-8")
+        return Blockstate(self, prefix, name, json.loads(json_loads_obj), properties=properties)
 
     @property
     def blockstate_files(self):
@@ -367,7 +371,11 @@ class Assets:
         if path in self._model_json_cache:
             return self._model_json_cache[path]
 
-        m = json.loads(self.source.load_file(path))
+        ### EDIT (Pull request from Berghopper)
+        json_loads_obj = self.source.load_file(path)
+        if isinstance(json_loads_obj, bytes):
+            json_loads_obj = json_loads_obj.decode("utf-8")
+        m = json.loads(json_loads_obj)
 
         textures = {}
         elements = {}
