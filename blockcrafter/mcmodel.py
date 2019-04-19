@@ -296,7 +296,8 @@ class EntityTextureSource:
         files.update(self.create_chest_files(source, "minecraft/textures/entity/chest/ender.png"))
         files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/normal_double.png"))
         files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/trapped_double.png"))
-        files.update(self.create_sign_files(source, "minecraft/textures/entity/sign.png"))
+        for path in source.glob_files("minecraft/textures/entity/signs/*.png"):
+            files.update(self.create_sign_files(source, path))
         for path in source.glob_files("minecraft/textures/entity/shulker/shulker*.png"):
             files.update(self.create_shulker_files(source, path))
         for path in source.glob_files("minecraft/textures/entity/bed/*.png"):

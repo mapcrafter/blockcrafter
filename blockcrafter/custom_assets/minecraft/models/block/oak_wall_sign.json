@@ -1,10 +1,10 @@
 {
     "textures": {
-        "post": "entity/sign/post",
-        "front": "entity/sign/front",
-        "back" : "entity/sign/back",
-        "side": "entity/sign/side",
-        "top": "entity/sign/top"
+        "post": "entity/signs/oak/post",
+        "front": "entity/signs/oak/front",
+        "back" : "entity/signs/oak/back",
+        "side": "entity/signs/oak/side",
+        "top": "entity/signs/oak/top"
     },
     "elements": [
         {

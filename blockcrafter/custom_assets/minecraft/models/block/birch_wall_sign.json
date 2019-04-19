@@ -1,0 +1,23 @@
+{
+    "textures": {
+        "post": "entity/signs/birch/post",
+        "front": "entity/signs/birch/front",
+        "back" : "entity/signs/birch/back",
+        "side": "entity/signs/birch/side",
+        "top": "entity/signs/birch/top"
+    },
+    "elements": [
+        {
+            "comment" : "sign",
+            "from": [ 0, 4, 0 ],
+            "to": [ 16, 12, 2 ],
+            "faces": {
+                "up" :  { "texture": "#top" },
+                "north":  { "texture": "#back" },
+                "south":  { "texture": "#front" },
+                "east":  { "texture": "#side" },
+                "west":  { "texture": "#side" }
+            }
+        }
+    ]
+}
