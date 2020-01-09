@@ -186,40 +186,51 @@ class EntityTextureSource:
         assert w == h
         f = w / 64
 
-        front = image.crop((int(f * 14), int(f * 14), int(f * 28), int(f * 28)))
-        front.paste(image.crop((int(f * 14), int(f * 33), int(f * 28), int(f * (33+14)))), (int(f * 0), int(f * 5)))
-        side = image.crop((int(f * 0), int(f * 14), int(f * 14), int(f * 28)))
-        side.paste(image.crop((int(f * 0), int(f * 33), int(f * 14), int(f * (33+14)))), (int(f * 0), int(f * 5)))
+        front = image.crop((int(f * 42), int(f * 33), int(f * 56), int(f * (33+15))))
+        front.paste(image.crop((int(f * 42), int(f * 14), int(f * 56), int(f * 19))), (int(f * 0), int(f * 10)))
+        front = front.transpose(Image.FLIP_TOP_BOTTOM)
+        side = image.crop((int(f * 0), int(f * 33), int(f * 14), int(f * (33+15))))
+        side.paste(image.crop((int(f * 0), int(f * 14), int(f * 14), int(f * 19))), (int(f * 0), int(f * 10)))
+        side = side.transpose(Image.FLIP_TOP_BOTTOM)
 
         files = {}
         files[base_name + "front.png"] = pack_image(front)
         files[base_name + "side.png"] = pack_image(side)
-        files[base_name + "top.png"] = pack_image(image.crop((int(f * 14), int(f * 0), int(f * 28), int(f * 14))))
+        files[base_name + "top.png"] = pack_image(image.crop((int(f * 28), int(f * 0), int(f * 42), int(f * 14))))
         files[base_name + "thing_front.png"] = pack_image(image.crop((int(f * 1), int(f * 1), int(f * 3), int(f * 5))))
         files[base_name + "thing_side.png"] = pack_image(image.crop((int(f * 0), int(f * 1), int(f * 1), int(f * 5))))
         files[base_name + "thing_top.png"] = pack_image(image.crop((int(f * 1), int(f * 0), int(f * 3), int(f * 1))))
 
         return files
 
-    def create_double_chest_files(self, source, path):
-        base_name = path.replace(".png", "/")
-        if len(source.glob_files(path)) == 0:
+    def create_double_chest_files(self, source, path_left, path_right):
+        base_name = path_left.replace("_left.png", "_double/")
+        if len(source.glob_files(path_left)) == 0 or len(source.glob_files(path_right)) == 0:
             return {}
-        image = Image.open(source.open_file(path)).convert("RGBA")
-        w, h = image.size
-        assert w == h * 2
-        f = w / 128
+        image_left = Image.open(source.open_file(path_left)).convert("RGBA")
+        image_right = Image.open(source.open_file(path_right)).convert("RGBA")
+        wl, hl = image_left.size
+        wr, hr = image_right.size
+        assert wl == hl
+        assert wr == hr
+        assert wl == wr
+        f = wl / 64
 
-        left_front = image.crop((int(f * 14), int(f * 14), int(f * 29), int(f * 28)))
-        left_front.paste(image.crop((int(f * 14), int(f * 33), int(f * 29), int(f * (33+14)))), (int(f * 0), int(f * 5)))
-        right_front = image.crop((int(f * 29), int(f * 14), int(f * 44), int(f * 28)))
-        right_front.paste(image.crop((int(f * 29), int(f * 33), int(f * 44), int(f * (33+14)))), (int(f * 0), int(f * 5)))
-        side = image.crop((int(f * 0), int(f * 14), int(f * 14), int(f * 28)))
-        side.paste(image.crop((int(f * 0), int(f * 33), int(f * 14), int(f * (33+14)))), (int(f * 0), int(f * 5)))
-        left_back = image.crop((int(f * 58), int(f * 14), int(f * 73), int(f * 28)))
-        left_back.paste(image.crop((int(f * 58), int(f * 33), int(f * 73), int(f * (33+14)))), (int(f * 0), int(f * 5)))
-        right_back = image.crop((int(f * 73), int(f * 14), int(f * 88), int(f * 28)))
-        right_back.paste(image.crop((int(f * 73), int(f * 33), int(f * 88), int(f * (33+14)))), (int(f * 0), int(f * 5)))
+        left_front = image_left.crop((int(f * 43), int(f * 33), int(f * 58), int(f * (33+15))))
+        left_front.paste(image_left.crop((int(f * 43), int(f * 14), int(f * 58), int(f * 19))), (int(f * 0), int(f * 10)))
+        left_front = left_front.transpose(Image.FLIP_TOP_BOTTOM)
+        right_front = image_right.crop((int(f * 43), int(f * 33), int(f * 58), int(f * (33+15))))
+        right_front.paste(image_right.crop((int(f * 43), int(f * 14), int(f * 58), int(f * 19))), (int(f * 0), int(f * 10)))
+        right_front = right_front.transpose(Image.FLIP_TOP_BOTTOM)
+        side = image_left.crop((int(f * 29), int(f * 33), int(f * 43), int(f * (33+15))))
+        side.paste(image_left.crop((int(f * 29), int(f * 14), int(f * 43), int(f * 19))), (int(f * 0), int(f * 10)))
+        side = side.transpose(Image.FLIP_TOP_BOTTOM)
+        left_back = image_left.crop((int(f * 14), int(f * 33), int(f * 29), int(f * (33+15))))
+        left_back.paste(image_left.crop((int(f * 14), int(f * 14), int(f * 29), int(f * 19))), (int(f * 0), int(f * 10)))
+        left_back = left_back.transpose(Image.FLIP_TOP_BOTTOM)
+        right_back = image_right.crop((int(f * 14), int(f * 33), int(f * 29), int(f * (33+15))))
+        right_back.paste(image_right.crop((int(f * 14), int(f * 14), int(f * 29), int(f * 19))), (int(f * 0), int(f * 10)))
+        right_back = right_back.transpose(Image.FLIP_TOP_BOTTOM)
 
         files = {}
         files[base_name + "left_front.png"] = pack_image(left_front)
@@ -227,11 +238,11 @@ class EntityTextureSource:
         files[base_name + "side.png"] = pack_image(side)
         files[base_name + "left_back.png"] = pack_image(left_back)
         files[base_name + "right_back.png"] = pack_image(right_back)
-        files[base_name + "left_top.png"] = pack_image(image.crop((int(f * 14), int(f * 0), int(f * 29), int(f * 14))))
-        files[base_name + "right_top.png"] = pack_image(image.crop((int(f * 29), int(f * 0), int(f * 44), int(f * 14))))
-        files[base_name + "thing_front.png"] = pack_image(image.crop((int(f * 1), int(f * 1), int(f * 3), int(f * 5))))
-        files[base_name + "thing_side.png"] = pack_image(image.crop((int(f * 0), int(f * 1), int(f * 1), int(f * 5))))
-        files[base_name + "thing_top.png"] = pack_image(image.crop((int(f * 1), int(f * 0), int(f * 3), int(f * 1))))
+        files[base_name + "left_top.png"] = pack_image(image_left.crop((int(f * 29), int(f * 0), int(f * 44), int(f * 14))).transpose(Image.FLIP_LEFT_RIGHT))
+        files[base_name + "right_top.png"] = pack_image(image_right.crop((int(f * 29), int(f * 0), int(f * 44), int(f * 14))).transpose(Image.FLIP_LEFT_RIGHT))
+        files[base_name + "thing_front.png"] = pack_image(image_left.crop((int(f * 1), int(f * 1), int(f * 3), int(f * 5))))
+        files[base_name + "thing_side.png"] = pack_image(image_left.crop((int(f * 3), int(f * 1), int(f * 4), int(f * 5))))
+        files[base_name + "thing_top.png"] = pack_image(image_left.crop((int(f * 1), int(f * 0), int(f * 3), int(f * 1))))
         return files
 
     def create_sign_files(self, source, path):
@@ -294,8 +305,8 @@ class EntityTextureSource:
         files.update(self.create_chest_files(source, "minecraft/textures/entity/chest/normal.png"))
         files.update(self.create_chest_files(source, "minecraft/textures/entity/chest/trapped.png"))
         files.update(self.create_chest_files(source, "minecraft/textures/entity/chest/ender.png"))
-        files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/normal_double.png"))
-        files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/trapped_double.png"))
+        files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/normal_left.png", "minecraft/textures/entity/chest/normal_right.png"))
+        files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/trapped_left.png", "minecraft/textures/entity/chest/trapped_right.png"))
         for path in source.glob_files("minecraft/textures/entity/signs/*.png"):
             files.update(self.create_sign_files(source, path))
         for path in source.glob_files("minecraft/textures/entity/shulker/shulker*.png"):
