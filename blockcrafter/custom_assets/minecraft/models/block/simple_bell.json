@@ -1,0 +1,42 @@
+{
+    "elements": [
+        {
+            "comment": "bell-middle",
+            "from": [ 5, 5, 5 ],
+            "to": [ 11, 13, 11 ],
+            "faces": {
+                "up": { "texture": "#top-middle" },
+                "north": { "texture": "#front-middle" },
+                "south": { "texture": "#back-middle" },
+                "east": { "texture": "#east-middle" },
+                "west": { "texture": "#west-middle" }
+            }
+        },
+        {
+            "comment": "bell-bottom",
+            "from": [ 4, 3, 4 ],
+            "to": [ 12, 5, 12 ],
+            "faces": {
+                "up": { "texture": "#top-bottom" },
+                "north": { "texture": "#front-bottom" },
+                "south": { "texture": "#back-bottom" },
+                "east": { "texture": "#east-bottom" },
+                "west": { "texture": "#west-bottom" }
+            }
+        }
+    ],
+    "textures": {
+        "front-middle": "entity/bell/bell_body/front",
+        "east-middle": "entity/bell/bell_body/east",
+        "back-middle": "entity/bell/bell_body/back",
+        "west-middle": "entity/bell/bell_body/west",
+        "side-middle": "entity/bell/bell_body/side",
+        "top-middle": "entity/bell/bell_body/top",
+        "front-bottom": "entity/bell/bell_body/low_front",
+        "east-bottom": "entity/bell/bell_body/low_east",
+        "back-bottom": "entity/bell/bell_body/low_back",
+        "west-bottom": "entity/bell/bell_body/low_west",
+        "side-bottom": "entity/bell/bell_body/low_side",
+        "top-bottom": "entity/bell/bell_body/low_top"
+    }
+}

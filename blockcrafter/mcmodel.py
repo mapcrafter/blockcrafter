@@ -262,6 +262,28 @@ class EntityTextureSource:
         files[base_name + "post.png"] = pack_image(image.crop((int(f * 2), int(f * 16), int(f * 4), int(f * 30))))
         return files
 
+    def create_bell_files(self, source, path):
+        base_name = path.replace(".png", "/")
+        if len(source.glob_files(path)) == 0:
+            return {}
+        image = Image.open(source.open_file(path)).convert("RGBA")
+        w, h = image.size
+        assert w == h
+        f = w / 32
+
+        files = {}
+        files[base_name + "front.png"] = pack_image(image.crop((int(f * 0), int(f * 6), int(f * 6), int(f * 13))).transpose(Image.FLIP_TOP_BOTTOM))
+        files[base_name + "east.png"] = pack_image(image.crop((int(f * 6), int(f * 6), int(f * 12), int(f * 13))).transpose(Image.FLIP_TOP_BOTTOM))
+        files[base_name + "back.png"] = pack_image(image.crop((int(f * 12), int(f * 6), int(f * 18), int(f * 13))).transpose(Image.FLIP_TOP_BOTTOM))
+        files[base_name + "west.png"] = pack_image(image.crop((int(f * 18), int(f * 6), int(f * 24), int(f * 13))).transpose(Image.FLIP_TOP_BOTTOM))
+        files[base_name + "top.png"] = pack_image(image.crop((int(f * 6), int(f * 0), int(f * 12), int(f * 6))))
+        files[base_name + "low_front.png"] = pack_image(image.crop((int(f * 0), int(f * 21), int(f * 8), int(f * 23))).transpose(Image.FLIP_TOP_BOTTOM))
+        files[base_name + "low_east.png"] = pack_image(image.crop((int(f * 8), int(f * 21), int(f * 16), int(f * 23))).transpose(Image.FLIP_TOP_BOTTOM))
+        files[base_name + "low_back.png"] = pack_image(image.crop((int(f * 16), int(f * 21), int(f * 24), int(f * 23))).transpose(Image.FLIP_TOP_BOTTOM))
+        files[base_name + "low_west.png"] = pack_image(image.crop((int(f * 24), int(f * 21), int(f * 32), int(f * 23))).transpose(Image.FLIP_TOP_BOTTOM))
+        files[base_name + "low_top.png"] = pack_image(image.crop((int(f * 8), int(f * 13), int(f * 16), int(f * 21))))
+        return files
+
     def create_shulker_files(self, source, path):
         base_name = path.replace(".png", "/")
         if len(source.glob_files(path)) == 0:
@@ -307,6 +329,7 @@ class EntityTextureSource:
         files.update(self.create_chest_files(source, "minecraft/textures/entity/chest/ender.png"))
         files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/normal_left.png", "minecraft/textures/entity/chest/normal_right.png"))
         files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/trapped_left.png", "minecraft/textures/entity/chest/trapped_right.png"))
+        files.update(self.create_bell_files(source, "minecraft/textures/entity/bell/bell_body.png"))
         for path in source.glob_files("minecraft/textures/entity/signs/*.png"):
             files.update(self.create_sign_files(source, path))
         for path in source.glob_files("minecraft/textures/entity/shulker/shulker*.png"):
