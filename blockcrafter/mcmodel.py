@@ -355,6 +355,9 @@ class EntityTextureSource:
         return data
 
 class Assets:
+
+    MINECRAFT_NAMESPACE = "minecraft:"
+
     def __init__(self, source):
         self.source = source
 
@@ -409,7 +412,11 @@ class Assets:
 
         if "parent" in m:
             prefix = path.split("/")[0]
-            parent = self._get_model_json(self.model_base.format(prefix=prefix) + "/" + m["parent"] + ".json")
+            parent_model = m["parent"]
+            # The model can have the minecraft: namespace in it since 1.16
+            if parent_model.startswith(self.MINECRAFT_NAMESPACE):
+                parent_model = parent_model[len(self.MINECRAFT_NAMESPACE):]
+            parent = self._get_model_json(self.model_base.format(prefix=prefix) + "/" + parent_model + ".json")
             textures.update(parent["textures"])
             if "elements" in parent:
                 elements = parent["elements"]
@@ -449,6 +456,9 @@ class Assets:
         return self.source.open_file(self.texture_base.format(prefix=prefix) + "/" + path, mode="rb")
 
 class Blockstate:
+    
+    MINECRAFT_NAMESPACE = "minecraft:"
+
     def __init__(self, assets, prefix, name, data, properties={}):
         self.assets = assets
         self.prefix = prefix
@@ -509,6 +519,9 @@ class Blockstate:
             if isinstance(modelref, list):
                 modelref = modelref[0]
             model_name = modelref["model"]
+            # The model can have the minecraft: namespace in it since 1.16
+            if model_name.startswith(self.MINECRAFT_NAMESPACE):
+                model_name = model_name[len(self.MINECRAFT_NAMESPACE):]
             model_transformation = dict(modelref)
             del model_transformation["model"]
             model = self.assets.get_model(self.prefix + "/models/" + model_name + ".json")
@@ -575,6 +588,9 @@ class Blockstate:
         return "<Blockstate prefix=%s name=%s>" % (self.prefix, self.name)
 
 class Model:
+
+    MINECRAFT_NAMESPACE = "minecraft:"
+
     def __init__(self, assets, prefix, name, data):
         self.assets = assets
         self.prefix = prefix
@@ -590,12 +606,15 @@ class Model:
         return self.data["elements"]
 
     def resolve_texture(self, texture):
-        if not texture.startswith("#"):
-            return texture
-        name = texture[1:]
-        if not name in self.textures:
-            return None
-        return self.resolve_texture(self.textures[name])
+        if texture.startswith("#"):
+            name = texture[1:]
+            if not name in self.textures:
+                return None
+            texture = self.resolve_texture(self.textures[name])
+        # The data can have the minecraft: namespace in it since 1.16
+        if texture != None and texture.startswith(self.MINECRAFT_NAMESPACE):
+            texture = texture[len(self.MINECRAFT_NAMESPACE):]
+        return texture
 
     def load_texture(self, name):
         return self.assets.load_texture(self.prefix, name + ".png")
