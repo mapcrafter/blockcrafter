@@ -322,6 +322,24 @@ class EntityTextureSource:
         files[base_name + "stand_inner.png"] = pack_image(image.crop((int(f * 56), int(f * 3), int(f * 59), int(f * 6))))
         return files
 
+    def create_conduit_files(self, source, path):
+        base_name = path.replace(".png", "/")
+        if len(source.glob_files(path)) == 0:
+            return {}
+        image = Image.open(source.open_file(path)).convert("RGBA")
+        w, h = image.size
+        assert w == h * 2
+        f = w / 32
+
+        files = {}
+        files[base_name + "up.png"] = pack_image(image.crop((int(f * 8), int(f * 0), int(f * 16), int(f * 8))))
+        files[base_name + "down.png"] = pack_image(image.crop((int(f * 16), int(f * 0), int(f * 24), int(f * 8))))
+        files[base_name + "north.png"] = pack_image(image.crop((int(f * 0), int(f * 8), int(f * 8), int(f * 16))))
+        files[base_name + "west.png"] = pack_image(image.crop((int(f * 8), int(f * 8), int(f * 16), int(f * 16))))
+        files[base_name + "south.png"] = pack_image(image.crop((int(f * 16), int(f * 8), int(f * 24), int(f * 16))))
+        files[base_name + "east.png"] = pack_image(image.crop((int(f * 24), int(f * 8), int(f * 32), int(f * 16))))
+        return files
+
     def create_files(self, source):
         files = {}
         files.update(self.create_chest_files(source, "minecraft/textures/entity/chest/normal.png"))
@@ -330,6 +348,7 @@ class EntityTextureSource:
         files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/normal_left.png", "minecraft/textures/entity/chest/normal_right.png"))
         files.update(self.create_double_chest_files(source, "minecraft/textures/entity/chest/trapped_left.png", "minecraft/textures/entity/chest/trapped_right.png"))
         files.update(self.create_bell_files(source, "minecraft/textures/entity/bell/bell_body.png"))
+        files.update(self.create_conduit_files(source, "minecraft/textures/entity/conduit/cage.png"))
         for path in source.glob_files("minecraft/textures/entity/signs/*.png"):
             files.update(self.create_sign_files(source, path))
         for path in source.glob_files("minecraft/textures/entity/shulker/shulker*.png"):
@@ -468,6 +487,8 @@ class Blockstate:
         self.extra_properties = properties
         self.waterloggable = properties.get("is_waterloggable", "") == "true"
         self.inherently_waterlogged = properties.get("inherently_waterlogged", "") == "true"
+        self.disable_blending = properties.get("disable_blending", "") == "true"
+        self.disable_culling = properties.get("disable_culling", "") == "true"
 
         if "biome_colormap" in self.extra_properties:
             def load_colormap(colormap):

@@ -5,12 +5,32 @@
             "when" : { "up" : "false" }
         },
         {
+            "apply" : { "model" : "block/full_water_south_up" },
+            "when": {
+                "up": "false",
+                "south": "false"
+            }
+        },
+        {
             "apply" : { "model" : "block/full_water_south" },
-            "when" : { "south" : "false" }
+            "when": {
+                "up": "true",
+                "south": "false"
+            }
+        },
+        {
+            "apply" : { "model" : "block/full_water_west_up" },
+            "when": {
+                "up": "false",
+                "west": "false"
+            }
         },
         {
             "apply" : { "model" : "block/full_water_west" },
-            "when" : { "west" : "false" }
+            "when": {
+                "up": "true",
+                "west": "false"
+            }
         }
     ]
 }

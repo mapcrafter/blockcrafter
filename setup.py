@@ -25,7 +25,7 @@ setup(
     ],
     keywords="",
     packages=find_packages(),
-    install_requires=["numpy", "vispy", "Pillow"],
+    install_requires=["numpy==1.17.5", "vispy==0.5.3", "Pillow==6.2.2"],
     extras_require={},
     package_data={
         "blockcrafter" : ["custom_assets", "blockstates.properties"]
