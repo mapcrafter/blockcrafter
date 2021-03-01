@@ -486,6 +486,9 @@ class Blockstate:
 
         self.extra_properties = properties
         self.waterloggable = properties.get("is_waterloggable", "") == "true"
+        self.default_variant = properties.get("default_variant", None)
+        if self.default_variant != None:
+            self.default_variant = dict(map(lambda pair: pair.split(":"), self.default_variant.split(";")))
         self.inherently_waterlogged = properties.get("inherently_waterlogged", "") == "true"
         self.disable_blending = properties.get("disable_blending", "") == "true"
         self.disable_culling = properties.get("disable_culling", "") == "true"
@@ -557,19 +560,16 @@ class Blockstate:
             for key, value in condition.items():
                 if key not in variables:
                     variables[key] = set()
-                
+                    if self.default_variant != None and key in self.default_variant:
+                        variables[key].add(self.default_variant[key])
+
                 if type(value) == bool:
                     value = "true" if value else "false"
 
                 values = set([value])
                 if "|" in value:
                     values = set(value.split("|"))
-                # TODO this is a bit hacky
-                # (just assume there must be true to false value, and vice versa)
-                if "true" in values:
-                    values.add("false")
-                if "false" in values:
-                    values.add("true")
+
                 variables[key].update(values)
 
         if "variants" in self.data:
@@ -663,7 +663,7 @@ def parse_variant(condition):
 def encode_variant(variant):
     if len(variant) == 0:
         return "-"
-    items = list(variant.items())
+    items = list(filter(lambda x: (x[0] != "default_variant"), list(variant.items())))
     items.sort(key = lambda i: i[0])
     return ",".join(map(lambda i: "=".join(i), items))
 

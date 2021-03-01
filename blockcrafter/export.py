@@ -28,7 +28,7 @@ from vispy import app, gloo, io, geometry
 from blockcrafter import mcmodel
 from blockcrafter import render
 
-COLUMNS = 32
+COLUMNS = 128
 
 class BlockImages:
     def __init__(self):

@@ -125,12 +125,12 @@ void main() {
 
     float face = float(u_face_index) / 6.0;
 
-    // Process the value of the Z position adn scale it to be
+    // Process the value of the Z position and scale it to be
     // stored in the alpha channel of pixel, hence why
     // the blending is disabled for UV mode.
     // It's purpose is mainly to merge blocks, such as waterlog
     vec4 t_rot = u_model * vec4(v_position, 1.0);
-    float t_z = min( 1/256 + max((t_rot.z + 1.0) * 0.5, 0), 1.0);
+    float t_z = min(max(((t_rot.z + 1.0) * 0.5) * 255.0/256.0 + 1.0/256.0, 1.0/256.0), 1.0);
 
     gl_FragColor = vec4(vec3(v_texcoord.xy, face), t_z);
 }
