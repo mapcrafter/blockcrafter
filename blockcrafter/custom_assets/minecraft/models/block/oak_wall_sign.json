@@ -1,0 +1,23 @@
+{
+    "textures": {
+        "post": "entity/signs/oak/post",
+        "front": "entity/signs/oak/front",
+        "back" : "entity/signs/oak/back",
+        "side": "entity/signs/oak/side",
+        "top": "entity/signs/oak/top"
+    },
+    "elements": [
+        {
+            "comment" : "sign",
+            "from": [ 0, 4, 0 ],
+            "to": [ 16, 12, 2 ],
+            "faces": {
+                "up" :  { "texture": "#top" },
+                "north":  { "texture": "#back" },
+                "south":  { "texture": "#front" },
+                "east":  { "texture": "#side" },
+                "west":  { "texture": "#side" }
+            }
+        }
+    ]
+}

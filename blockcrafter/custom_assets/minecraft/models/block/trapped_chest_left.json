@@ -3,7 +3,7 @@
     "textures": {
         "front": "entity/chest/trapped_double/left_front",
         "side": "entity/chest/trapped_double/side",
-        "right_back": "entity/chest/trapped_double/right_back",
+        "back": "entity/chest/trapped_double/left_back",
         "top": "entity/chest/trapped_double/left_top",
         "thing_front": "entity/chest/trapped_double/thing_front",
         "thing_side": "entity/chest/trapped_double/thing_side",

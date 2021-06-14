@@ -1,0 +1,8 @@
+4c4
+< #from fractions import gcd
+---
+> from fractions import gcd
+91c91
+<         return math.gcd(self._p, self._q)
+---
+>         return gcd(self._p, self._q)

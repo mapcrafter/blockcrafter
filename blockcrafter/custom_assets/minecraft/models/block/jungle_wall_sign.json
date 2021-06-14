@@ -1,0 +1,23 @@
+{
+    "textures": {
+        "post": "entity/signs/jungle/post",
+        "front": "entity/signs/jungle/front",
+        "back" : "entity/signs/jungle/back",
+        "side": "entity/signs/jungle/side",
+        "top": "entity/signs/jungle/top"
+    },
+    "elements": [
+        {
+            "comment" : "sign",
+            "from": [ 0, 4, 0 ],
+            "to": [ 16, 12, 2 ],
+            "faces": {
+                "up" :  { "texture": "#top" },
+                "north":  { "texture": "#back" },
+                "south":  { "texture": "#front" },
+                "east":  { "texture": "#side" },
+                "west":  { "texture": "#side" }
+            }
+        }
+    ]
+}

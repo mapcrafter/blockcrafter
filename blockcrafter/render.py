@@ -124,7 +124,15 @@ void main() {
     }
 
     float face = float(u_face_index) / 6.0;
-    gl_FragColor = vec4(vec3(v_texcoord.xy, face), 1.0);
+
+    // Process the value of the Z position and scale it to be
+    // stored in the alpha channel of pixel, hence why
+    // the blending is disabled for UV mode.
+    // It's purpose is mainly to merge blocks, such as waterlog
+    vec4 t_rot = u_model * vec4(v_position, 1.0);
+    float t_z = min(max(((t_rot.z + 1.0) * 0.5) * 255.0/256.0 + 1.0/256.0, 1.0/256.0), 1.0);
+
+    gl_FragColor = vec4(vec3(v_texcoord.xy, face), t_z);
 }
 """
 
@@ -410,7 +418,7 @@ class Element:
             data = np.array(image)
             semi_transparent = np.all((data[:, :, 3] == 0) | (data[:, :, 3] == 255))
             w, h = image.size
-            image = image.resize((w*2, h*2), resample=Image.BILINEAR)
+            image = image.resize((w*2, h*2), resample=Image.NEAREST)
             data = np.array(image)
             if semi_transparent:
                 data[:, :, 3] = (data[:, :, 3] > 255/2.0) * 255
@@ -420,7 +428,7 @@ class Element:
                 data[:, :, 0] = data[:, :, 0] * r
                 data[:, :, 1] = data[:, :, 1] * g
                 data[:, :, 2] = data[:, :, 2] * b
-            faces[direction] = (gloo.Texture2D(data=data, interpolation="nearest"), (uv0, uv1))
+            faces[direction] = (gloo.Texture2D(data=data, interpolation="linear"), (uv0, uv1))
             f.close()
 
         # gather faces in order for cube sides
@@ -515,6 +523,12 @@ def create_transform_perspective(aspect=1.0):
 def apply_model_rotation(model, rotation=0, phi=0.0):
     rotation = transforms.rotate(-rotation * 90 + phi, (0, 1, 0))
     return np.dot(rotation, model)
+
+def apply_face_culling(on=True):
+    if on:
+        gloo.set_state(cull_face=True)
+    else:
+        gloo.set_state(cull_face=False)
 
 def set_blending(mode):
     if mode == "premultiplied":

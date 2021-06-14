@@ -28,7 +28,7 @@ from vispy import app, gloo, io, geometry
 from blockcrafter import mcmodel
 from blockcrafter import render
 
-COLUMNS = 32
+COLUMNS = 128
 
 class BlockImages:
     def __init__(self):
@@ -132,15 +132,19 @@ class Canvas(app.Canvas):
                         actual_rotation = rotation
                         if name == "minecraft:full_water":
                             actual_rotation = 0
-                        if name == "minecraft:ice":
+                        if blockstate.disable_blending or mode=="uv":
                             render.set_blending("opaque")
                         else:
                             render.set_blending("premultiplied")
+                        if blockstate.disable_culling:
+                            render.apply_face_culling(on=False)
+                        else:
+                            render.apply_face_culling(on=True)
                         actual_model = render.apply_model_rotation(model, rotation=0)
                         glblock.render(variant, actual_model, view, projection, rotation=actual_rotation, mode=mode)
 
                     array = np.array(fbo.read("color"))
-                    if name == "minecraft:ice":
+                    if blockstate.disable_blending:
                         # make image opaque
                         if mode == "color":
                             array[:, :, 3] = (array[:, :, 3] > 0) * 255
